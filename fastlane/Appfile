@@ -1,0 +1,3 @@
+# Bundle ID is computed in Fastfile from TEAMID secret:
+#   org.pov-it.<TEAMID>.meals
+# team_id is taken from ENV["TEAMID"] at lane runtime.
