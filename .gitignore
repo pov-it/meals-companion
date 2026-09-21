@@ -14,7 +14,7 @@ DerivedData/
 *.dSYM
 *.dSYM.zip
 
-# Local team override (keep Config/Team.xcconfig as the committed placeholder)
+# Local team override (committed default is Config/Team.xcconfig)
 Config/Team.local.xcconfig
 
 # OS

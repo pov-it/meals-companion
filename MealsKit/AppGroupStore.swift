@@ -3,11 +3,11 @@ import UIKit
 
 public enum RuntimeConfig {
     public static var appGroupIdentifier: String {
-        plistValue("MealsAppGroupIdentifier") ?? "group.org.pov-it.TEAMID.meals"
+        plistValue("MealsAppGroupIdentifier") ?? "group.org.pov-it.Q6QCL8J6FN.meals"
     }
 
     public static var cloudKitContainerIdentifier: String {
-        plistValue("MealsCloudKitContainerIdentifier") ?? "iCloud.org.pov-it.TEAMID.meals"
+        plistValue("MealsCloudKitContainerIdentifier") ?? "iCloud.org.pov-it.Q6QCL8J6FN.meals"
     }
 
     private static func plistValue(_ key: String) -> String? {

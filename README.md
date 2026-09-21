@@ -18,27 +18,26 @@ Open `MealsCompanion.xcodeproj` on a Mac with Xcode 15.4+ (iOS 17 SDK).
 
 ## Identifiers (TEAM / BUNDLE)
 
-All IDs are derived from `DEVELOPMENT_TEAM` in xcconfig. Edit **one** placeholder:
+All IDs are derived from `DEVELOPMENT_TEAM` in `Config/Team.xcconfig`. That file is set to Marijn’s team:
 
 ```xcconfig
-// Config/Team.xcconfig
-DEVELOPMENT_TEAM = TEAMID
+DEVELOPMENT_TEAM = Q6QCL8J6FN
 ```
 
-`Config/Shared.xcconfig` then produces:
+`Config/Shared.xcconfig` expands that to:
 
-| Setting | Pattern |
+| Setting | Resolved value |
 | --- | --- |
-| App bundle ID | `org.pov-it.$(DEVELOPMENT_TEAM).meals` |
-| Widget bundle ID | `org.pov-it.$(DEVELOPMENT_TEAM).meals.widget` |
-| App Group | `group.org.pov-it.$(DEVELOPMENT_TEAM).meals` |
-| CloudKit container | `iCloud.org.pov-it.$(DEVELOPMENT_TEAM).meals` |
+| App bundle ID | `org.pov-it.Q6QCL8J6FN.meals` |
+| Widget bundle ID | `org.pov-it.Q6QCL8J6FN.meals.widget` |
+| App Group | `group.org.pov-it.Q6QCL8J6FN.meals` |
+| CloudKit container | `iCloud.org.pov-it.Q6QCL8J6FN.meals` |
 
-Replace `TEAMID` with the real 10-character Team ID **before** creating App IDs, App Groups, or the CloudKit container. Changing the team later changes every identifier.
+Those identifiers already exist on the Apple Developer portal. Changing `DEVELOPMENT_TEAM` later would change every identifier.
 
-Optional: copy `Config/Team.xcconfig` to `Config/Team.local.xcconfig` (gitignored) if you do not want a team id in git. You would then `#include "Team.local.xcconfig"` from `Shared.xcconfig` instead.
+Optional: copy `Config/Team.xcconfig` to `Config/Team.local.xcconfig` (gitignored) and switch `Shared.xcconfig` to `#include "Team.local.xcconfig"` if you do not want a team id in git.
 
-Signing uses the same Apple Developer team that will sign later. This repo contains **no certificates, no API keys, no secrets**.
+This repo contains **no certificates, no API keys, no secrets**.
 
 ## Pairing (CloudKit share)
 
@@ -55,7 +54,7 @@ Trio does not need to be on her phone. She must sign in to iCloud.
 
 ### Record contract (publisher must match)
 
-Container: `iCloud.org.pov-it.$(DEVELOPMENT_TEAM).meals`  
+Container: `iCloud.org.pov-it.Q6QCL8J6FN.meals`  
 Zone: `MealsZone` (private DB on Marijn’s side, shared via `CKShare`)
 
 **`MealFeed`** (one root record, shared)
@@ -114,7 +113,7 @@ Do **not** add her to Trio’s TestFlight group. Create a separate App Store Con
 3. **Limit her app access** to **Meals Companion only**. Uncheck Trio and every other app. This is the step that keeps Trio private.
 4. Open the **Meals Companion** app record (not Trio) → **TestFlight** → **Internal Testing**.
 5. Create a group (e.g. `Mayee`) and add her.
-6. Archive **this** project in Xcode (Release, real `DEVELOPMENT_TEAM`) and upload the build. Bump `CURRENT_PROJECT_VERSION` in `Config/Shared.xcconfig` for each upload. Wait for processing.
+6. Archive **this** project in Xcode (Release, team `Q6QCL8J6FN`) and upload the build. Bump `CURRENT_PROJECT_VERSION` in `Config/Shared.xcconfig` for each upload. Wait for processing.
 7. She accepts the App Store Connect user invite, installs **TestFlight**, and installs **Meals** — not Trio.
 
 Internal testers are App Store Connect users. If you skip “limit app access”, she may see Trio in ASC. External TestFlight is a different path (no ASC user); this README follows the requested internal-tester flow.
@@ -123,18 +122,17 @@ Internal testers are App Store Connect users. If you skip “limit app access”
 
 This repo is structural. It will not talk to iCloud until the Apple-side work exists. None of that can be done from git.
 
-1. **Paid Apple Developer Program** on the same team that will sign Trio and this app.
-2. Set `DEVELOPMENT_TEAM` in `Config/Team.xcconfig`.
-3. Developer portal → Identifiers:
-   - App ID for `org.pov-it.<TEAM>.meals` with App Groups, iCloud (CloudKit), Push Notifications.
-   - App ID for `org.pov-it.<TEAM>.meals.widget` with the same App Group (widget does not need CloudKit).
-   - App Group `group.org.pov-it.<TEAM>.meals`.
-   - CloudKit container `iCloud.org.pov-it.<TEAM>.meals`.
-4. Xcode: select the team, let it regenerate capabilities if it offers to. Confirm entitlements still use the xcconfig variables.
-5. **CloudKit Dashboard**: create the container if needed, add record types `Meal` and `MealFeed` with the fields above, mark `Meal` as **queryable**, create `MealsZone` (or let Trio create it), and **Deploy Schema to Production** before TestFlight. Development-environment CloudKit does not serve TestFlight/App Store builds.
-6. **Trio publisher work (not in this repo):** add this meals container as a *second* CloudKit container on Trio (leave glucose in Trio’s existing container), write only `Meal` / `MealFeed` records, create the `CKShare`, invite Mayee. Until that ships, this app can pair in UI form only.
-7. Upload a TestFlight build of **this** app.
-8. On her phone: iCloud signed in, install Meals, accept the share, add the widget.
+1. **Paid Apple Developer Program** on team `Q6QCL8J6FN` (already set in `Config/Team.xcconfig`).
+2. Developer portal identifiers already exist for this team:
+   - App ID `org.pov-it.Q6QCL8J6FN.meals` with App Groups, iCloud (CloudKit), Push Notifications.
+   - App ID `org.pov-it.Q6QCL8J6FN.meals.widget` with the same App Group (widget does not need CloudKit).
+   - App Group `group.org.pov-it.Q6QCL8J6FN.meals`.
+   - CloudKit container `iCloud.org.pov-it.Q6QCL8J6FN.meals`.
+3. Xcode: select team `Q6QCL8J6FN`, let it regenerate capabilities if it offers to. Confirm entitlements still use the xcconfig variables.
+4. **CloudKit Dashboard**: add record types `Meal` and `MealFeed` with the fields above if they are not already there, mark `Meal` as **queryable**, create `MealsZone` (or let Trio create it), and **Deploy Schema to Production** before TestFlight. Development-environment CloudKit does not serve TestFlight/App Store builds.
+5. **Trio publisher work (not in this repo):** add this meals container as a *second* CloudKit container on Trio (leave glucose in Trio’s existing container), write only `Meal` / `MealFeed` records, create the `CKShare`, invite Mayee. Until that ships, this app can pair in UI form only.
+6. Archive and upload a TestFlight build of **this** app when you are ready. This repo does not record TestFlight or build status.
+7. On her phone: iCloud signed in, install Meals, accept the share, add the widget.
 
 Honest gaps:
 
