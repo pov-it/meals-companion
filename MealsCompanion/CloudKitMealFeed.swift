@@ -256,7 +256,8 @@ struct CloudKitMealClient: Sendable {
 
     func accept(metadata: CKShare.Metadata, shareURL: URL? = nil) async throws -> PairingState {
         do {
-            try await metadata.container.accept(metadata)
+            let shareContainer = CKContainer(identifier: metadata.containerIdentifier)
+            try await shareContainer.accept(metadata)
         } catch {
             throw MealFeedError.acceptFailed(error.localizedDescription)
         }
