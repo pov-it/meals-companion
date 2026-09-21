@@ -1,9 +1,14 @@
 name: Build Meals Companion
 run-name: Build Meals Companion (${{ github.ref_name }})
 
-# Manual only — no cron. Same Apple secret names as pov-it/Trio browser build.
+# workflow_dispatch is the normal entry. push on main lets an agent that
+# cannot call the Actions API (no actions:write) re-run this workflow.
+# Same Apple secret names as pov-it/Trio browser build.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
