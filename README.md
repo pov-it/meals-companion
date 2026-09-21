@@ -141,9 +141,9 @@ Match storage is `https://github.com/<owner>/Match-Secrets.git` (same repo Trio 
 
 1. **App Store Connect app** for Meals Companion must exist with bundle ID `org.pov-it.<TEAMID>.meals` (create manually in ASC; the upload lane does not create the app record).
 2. Run **Actions → “Add Meals Identifiers” → Run workflow** once. That lane:
-   - registers App IDs `…meals` and `…meals.widget` (App Groups / iCloud / Push on the app; App Groups on the widget);
+   - registers App IDs `…meals` and `…meals.widget`, enables App Groups / iCloud (CloudKit) / Push, and wires App Group + CloudKit container onto those App IDs via ASC;
    - runs Match to create App Store profiles into `Match-Secrets`.
-3. In the Developer portal, confirm App Group `group.org.pov-it.<TEAMID>.meals` and CloudKit container `iCloud.org.pov-it.<TEAMID>.meals` are created and linked (Spaceship capability flags alone are not always enough for group/container linkage).
+3. App Group `group.org.pov-it.<TEAMID>.meals` and CloudKit container `iCloud.org.pov-it.<TEAMID>.meals` must already exist in the Developer portal (created earlier). The identifiers lane links them onto the App IDs; if ASC refuses the relationship call, finish Configure on each App ID in the portal, then re-run Add Meals Identifiers (force-regenerates Match profiles).
 4. **Enable the workflow files first** (one-time): this PR ships them under `ci/github-workflows/` because a GitHub OAuth token without the `workflow` scope cannot create `.github/workflows/*.yml`. With a PAT/`gh` auth that includes `workflow`:
 
 ```bash

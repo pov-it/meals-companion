@@ -58,42 +58,218 @@ def match_git_basic_auth
   Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}")
 end
 
+# Raw provisioning client used by Spaceship after app_store_connect_api_key.
+def provisioning_client
+  Spaceship::ConnectAPI.client.provisioning_request_client
+end
+
+def asc_get(path, params = nil)
+  provisioning_client.get(path, params)
+end
+
+def asc_post(path, body)
+  provisioning_client.post(path, body)
+end
+
+def asc_patch(path, body)
+  # APIClient may not expose patch publicly on all versions — fall through to request.
+  client = provisioning_client
+  if client.respond_to?(:patch)
+    client.patch(path, body)
+  else
+    response = client.send(:request, :patch) do |req|
+      req.url(path)
+      req.body = body.to_json
+      req.headers["Content-Type"] = "application/json"
+    end
+    client.send(:handle_response, response)
+  end
+end
+
+def find_bundle_id_record(identifier)
+  Spaceship::ConnectAPI::BundleId.find(identifier) ||
+    UI.user_error!("Bundle ID not found: #{identifier}")
+end
+
+def ensure_capability!(bundle, capability_type, settings: [])
+  existing = bundle.get_capabilities.find { |c| c.is_type?(capability_type) }
+  if existing.nil?
+    UI.message("Enabling #{capability_type} on #{bundle.identifier}")
+    bundle.create_capability(capability_type, settings: settings)
+  elsif !settings.empty?
+    UI.message("Updating #{capability_type} settings on #{bundle.identifier}")
+    begin
+      existing.update!(settings: settings)
+    rescue StandardError => e
+      UI.important("Could not update #{capability_type} settings (continuing): #{e.message}")
+    end
+  else
+    UI.message("#{capability_type} already enabled on #{bundle.identifier}")
+  end
+  # Refresh capability id
+  bundle.get_capabilities.find { |c| c.is_type?(capability_type) }
+end
+
+# Resolve an App Group / Cloud Container resource id via ASC API.
+def find_resource_id(collection:, identifier:)
+  path = "v1/#{collection}"
+  begin
+    resp = asc_get(path, provisioning_client.build_params(filter: { identifier: identifier }, limit: 10))
+    rows = (resp.body && resp.body["data"]) || []
+    hit = rows.find { |r| r.dig("attributes", "identifier") == identifier }
+    return hit["id"] if hit
+  rescue StandardError => e
+    UI.message("GET #{path}?filter[identifier]=… failed: #{e.message}")
+  end
+
+  # Create (or re-create) to obtain an id when list/filter is unavailable.
+  begin
+    resp = asc_post(path, {
+      data: {
+        type: collection,
+        attributes: {
+          identifier: identifier,
+          name: identifier
+        }
+      }
+    })
+    id = resp.body.dig("data", "id") if resp && resp.body
+    return id if id
+  rescue StandardError => e
+    UI.message("POST #{path} for #{identifier} failed: #{e.message}")
+    # Some 409 responses include the existing resource id
+    if e.message =~ /"id"\s*:\s*"([^"]+)"/
+      return Regexp.last_match(1)
+    end
+  end
+  nil
+end
+
+def existing_relationship_ids(bundle_id_id, relationship)
+  path = "v1/bundleIds/#{bundle_id_id}/relationships/#{relationship}"
+  resp = asc_get(path)
+  rows = (resp.body && resp.body["data"]) || []
+  rows.map { |r| r["id"] }
+rescue StandardError
+  []
+end
+
+def link_resources!(bundle_id_id:, relationship:, resource_type:, resource_id:)
+  path = "v1/bundleIds/#{bundle_id_id}/relationships/#{relationship}"
+  body = { data: [{ type: resource_type, id: resource_id }] }
+
+  begin
+    asc_post(path, body)
+    UI.success("Linked #{resource_type} #{resource_id} → #{bundle_id_id} (POST #{relationship})")
+    return true
+  rescue StandardError => e
+    if e.message =~ /409|already|exist|duplicate/i
+      UI.success("#{resource_type} already linked on #{bundle_id_id}")
+      return true
+    end
+    UI.message("POST #{path} failed (#{e.message}); trying PATCH…")
+  end
+
+  begin
+    merged = (existing_relationship_ids(bundle_id_id, relationship) + [resource_id]).uniq
+    asc_patch(path, { data: merged.map { |id| { type: resource_type, id: id } } })
+    UI.success("Linked #{resource_type} #{resource_id} → #{bundle_id_id} (PATCH #{relationship})")
+    true
+  rescue StandardError => e
+    UI.error("Failed to link #{resource_type} on #{bundle_id_id}: #{e.message}")
+    false
+  end
+end
+
+def wire_app_group!(bundle, group_identifier)
+  group_id = find_resource_id(collection: "appGroups", identifier: group_identifier)
+  candidates = [group_id, group_identifier].compact.uniq
+  UI.message("App Group #{group_identifier} candidates: #{candidates.inspect}")
+  candidates.each do |rid|
+    return true if link_resources!(
+      bundle_id_id: bundle.id,
+      relationship: "appGroups",
+      resource_type: "appGroups",
+      resource_id: rid
+    )
+  end
+  UI.important("Could not wire App Group #{group_identifier} onto #{bundle.identifier}")
+  false
+end
+
+def wire_cloud_container!(bundle, container_identifier)
+  container_id = find_resource_id(collection: "cloudContainers", identifier: container_identifier)
+  candidates = [container_id, container_identifier].compact.uniq
+  UI.message("Cloud Container #{container_identifier} candidates: #{candidates.inspect}")
+  candidates.each do |rid|
+    return true if link_resources!(
+      bundle_id_id: bundle.id,
+      relationship: "cloudContainers",
+      resource_type: "cloudContainers",
+      resource_id: rid
+    )
+  end
+  UI.important("Could not wire Cloud Container #{container_identifier} onto #{bundle.identifier}")
+  false
+end
+
 platform :ios do
-  desc "Register App IDs + capabilities for Meals Companion (one-time / when IDs change)"
+  desc "Register App IDs + capabilities + wire App Group / CloudKit container, then ready for Match"
   lane :identifiers do
     setup_ci if ENV["CI"]
     ENV["MATCH_READONLY"] = false.to_s
     bundle_id = meals_bundle_id
     widget_id = widget_bundle_id
+    app_group = meals_app_group
+    icloud = meals_icloud_container
 
     connect_api_key
 
-    def configure_bundle_id(name, identifier, capabilities)
-      bundle = Spaceship::ConnectAPI::BundleId.find(identifier) || Spaceship::ConnectAPI::BundleId.create(
+    ensure_bundle = lambda do |name, identifier|
+      Spaceship::ConnectAPI::BundleId.find(identifier) || Spaceship::ConnectAPI::BundleId.create(
         name: name,
         identifier: identifier,
         platform: "IOS"
       )
-      existing = bundle.get_capabilities.map(&:capability_type)
-      capabilities.reject { |c| existing.include?(c) }.each do |cap|
-        bundle.create_capability(cap)
-      end
     end
 
-    # App: App Groups + iCloud (CloudKit) + Push (silent widget refresh)
-    configure_bundle_id("Meals Companion", bundle_id, [
-      Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS,
-      Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
-      Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS
-    ])
+    app = ensure_bundle.call("Meals Companion", bundle_id)
+    widget = ensure_bundle.call("Meals Companion Widget", widget_id)
+
+    icloud_settings = [
+      {
+        "key" => Spaceship::ConnectAPI::BundleIdCapability::Settings::ICLOUD_VERSION,
+        "options" => [
+          { "key" => Spaceship::ConnectAPI::BundleIdCapability::Options::XCODE_6 }
+        ]
+      }
+    ]
+
+    # App: App Groups + iCloud (CloudKit / Xcode 6) + Push
+    ensure_capability!(app, Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS)
+    ensure_capability!(app, Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD, settings: icloud_settings)
+    ensure_capability!(app, Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS)
 
     # Widget: App Groups only
-    configure_bundle_id("Meals Companion Widget", widget_id, [
-      Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS
-    ])
+    ensure_capability!(widget, Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS)
 
-    UI.important("Bundle IDs ensured: #{bundle_id}, #{widget_id}")
-    UI.important("Still create/link App Group #{meals_app_group} and CloudKit container #{meals_icloud_container} in the Developer portal if not already present, and create the ASC app record before TestFlight upload.")
+    UI.important("Wiring App Group #{app_group} onto #{bundle_id} and #{widget_id}")
+    app_group_ok = wire_app_group!(app, app_group)
+    widget_group_ok = wire_app_group!(widget, app_group)
+
+    UI.important("Wiring CloudKit container #{icloud} onto #{bundle_id}")
+    cloud_ok = wire_cloud_container!(app, icloud)
+
+    unless app_group_ok && widget_group_ok && cloud_ok
+      UI.user_error!(
+        "Failed to wire App Group and/or CloudKit container onto App IDs via ASC API. " \
+        "Capabilities may be enabled but specific IDs are not linked — Match profiles will lack entitlements. " \
+        "Link manually in Developer portal (Identifiers → each App ID → App Groups / iCloud Configure), then re-run."
+      )
+    end
+
+    UI.success("Bundle IDs ensured and wired: #{bundle_id}, #{widget_id}")
+    UI.success("App Group #{app_group} + CloudKit #{icloud} linked")
   end
 
   desc "Create/update App Store provisioning profiles via Match for Meals + widget"
@@ -105,9 +281,10 @@ platform :ios do
 
     connect_api_key
 
+    # force: true regenerates profiles so newly linked App Group / iCloud entitlements are included
     match(
       type: "appstore",
-      force: false,
+      force: true,
       verbose: true,
       git_basic_authorization: match_git_basic_auth,
       app_identifier: [bundle_id, widget_id]
