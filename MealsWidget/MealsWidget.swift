@@ -220,8 +220,12 @@ struct MealsWidgetBundle: WidgetBundle {
 
 #Preview("Small empty", as: .systemSmall) {
     MealsWidget()
+} timeline: {
+    MealsWidgetEntry(date: .now, snapshot: .empty, image: nil)
 }
 
 #Preview("Medium empty", as: .systemMedium) {
     MealsWidget()
+} timeline: {
+    MealsWidgetEntry(date: .now, snapshot: .empty, image: nil)
 }
