@@ -1,0 +1,14 @@
+#include "Team.xcconfig"
+
+// Identifiers derived from DEVELOPMENT_TEAM. Change the team in
+// Team.xcconfig; do not hard-code bundle IDs on the targets.
+MEALS_BUNDLE_BASE = org.pov-it.$(DEVELOPMENT_TEAM).meals
+WIDGET_BUNDLE_IDENTIFIER = $(MEALS_BUNDLE_BASE).widget
+MEALS_APP_GROUP = group.$(MEALS_BUNDLE_BASE)
+CLOUDKIT_CONTAINER_IDENTIFIER = iCloud.$(MEALS_BUNDLE_BASE)
+
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 5.9
+TARGETED_DEVICE_FAMILY = 1,2

@@ -1,0 +1,487 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		467FEC1E4D8F8701141711CF /* MealModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41C41AB8C9931888715F43C /* MealModels.swift */; };
+		1479FDFF7A6907B5F9BFA832 /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 306671B3DDB4243E00B312C0 /* AppGroupStore.swift */; };
+		BA399CFB5E23991CBEF666EC /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6394DD763ACB67478C901556 /* Theme.swift */; };
+		D1D7E48ECF0783FE2DB79B19 /* MealsCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71921E64B2FAB8E357024F9 /* MealsCompanionApp.swift */; };
+		0FC66E060F6B1FF5273D346C /* CloudKitMealFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C90BF307703E941D447B992 /* CloudKitMealFeed.swift */; };
+		3974BDD66188975E0A1AD6D7 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525203B088ECC46965CAFAC4 /* RootView.swift */; };
+		B0C6181992B362D2C7610BD8 /* PairingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D9241E0A5DFEDAF6D02F8B /* PairingView.swift */; };
+		CC3CD54660F5AABA6B944C5F /* MealFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8464F8D1E0E769AF221590C9 /* MealFeedView.swift */; };
+		571842371DEF5D08BB8E7BC8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C13A4EF0DBD8A59B35AF8B /* SettingsView.swift */; };
+		82799BF11C97BB134A17C7C2 /* MealModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41C41AB8C9931888715F43C /* MealModels.swift */; };
+		36EAE973BBC2C30EF595E919 /* AppGroupStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 306671B3DDB4243E00B312C0 /* AppGroupStore.swift */; };
+		72670254952ADCE311B520E5 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6394DD763ACB67478C901556 /* Theme.swift */; };
+		70A30EA72F6FA929808C87D7 /* MealsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73191E57F709379AD1CB829 /* MealsWidget.swift */; };
+		5C9E6E8858AAC9D568FFDA9A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8BE1AD557FF3E6330C225AB2 /* Assets.xcassets */; };
+		1D807DF42C538D2EFC8DDA28 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8BE1AD557FF3E6330C225AB2 /* Assets.xcassets */; };
+		34136F0C76501ECBE6B48914 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DE3308CBEC6A3142E9CC9361 /* Assets.xcassets */; };
+		4B6B8E840EA2A31D8EF54A98 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 43D1B406D84CBB9B79C452C8 /* Assets.xcassets */; };
+		431DD5C5E0685DD232BE33ED /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7FF520638BFE476E7DCD485C /* PrivacyInfo.xcprivacy */; };
+		C4A76B4A767A097F81F245D1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EF548DEE8C8AC4C2DBD7243E /* PrivacyInfo.xcprivacy */; };
+		AC0DC4E8CDD993B3F6789C1A /* MealsWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1B57B0C87A58442C489D3141 /* MealsWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D799BAE6088A90139B415FCC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = ADEAF5E167D4943BE484764E;
+			remoteInfo = MealsWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		698FBDDE4AA5C53470246104 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AC0DC4E8CDD993B3F6789C1A /* MealsWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		5718BA8B2965F0F686C8E55B /* Meals.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Meals.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1B57B0C87A58442C489D3141 /* MealsWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MealsWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C98037B6C3E021E89DE8C61C /* Team.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Team.xcconfig; sourceTree = "<group>"; };
+		31519DC89E8C59A1CD3AE0AA /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		4D5F502CF336DFF7F6AE5EC3 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		B863CD0EFC510C4E87DB4D3B /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		8B24EF8E369CAB015547FB85 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		347E468448E0A8107D7B0EC6 /* Widget.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Widget.xcconfig; sourceTree = "<group>"; };
+		C41C41AB8C9931888715F43C /* MealModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealModels.swift; sourceTree = "<group>"; };
+		306671B3DDB4243E00B312C0 /* AppGroupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupStore.swift; sourceTree = "<group>"; };
+		6394DD763ACB67478C901556 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		D71921E64B2FAB8E357024F9 /* MealsCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsCompanionApp.swift; sourceTree = "<group>"; };
+		4C90BF307703E941D447B992 /* CloudKitMealFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitMealFeed.swift; sourceTree = "<group>"; };
+		525203B088ECC46965CAFAC4 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		56D9241E0A5DFEDAF6D02F8B /* PairingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingView.swift; sourceTree = "<group>"; };
+		8464F8D1E0E769AF221590C9 /* MealFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealFeedView.swift; sourceTree = "<group>"; };
+		05C13A4EF0DBD8A59B35AF8B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		C73191E57F709379AD1CB829 /* MealsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealsWidget.swift; sourceTree = "<group>"; };
+		8BE1AD557FF3E6330C225AB2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DE3308CBEC6A3142E9CC9361 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C6A79C1BA590FC57A817B029 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C325985ED90AA7600F8B020D /* MealsCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MealsCompanion.entitlements; sourceTree = "<group>"; };
+		7FF520638BFE476E7DCD485C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		43D1B406D84CBB9B79C452C8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7578703AC2A8FB20583832A5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BE8A3382CE9302457DB090B9 /* MealsWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MealsWidget.entitlements; sourceTree = "<group>"; };
+		EF548DEE8C8AC4C2DBD7243E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		EF16F7BCB74D19EF18CC1216 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE6AE36FF6C4FF3C1CD7E735 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		BDE88D77EBDC01774960BE71 = {
+			isa = PBXGroup;
+			children = (
+				45372EAFF4368F31E54BD277 /* Config */,
+				45316B45CB436116EC434408 /* MealsKit */,
+				4B48653AF5A0B20C6ED00351 /* MealsCompanion */,
+				237ED2667819882798ED7400 /* MealsWidget */,
+				4FDE57E4B72FFCEE306CEB0F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4FDE57E4B72FFCEE306CEB0F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5718BA8B2965F0F686C8E55B /* Meals.app */,
+				1B57B0C87A58442C489D3141 /* MealsWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		45372EAFF4368F31E54BD277 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				C98037B6C3E021E89DE8C61C /* Team.xcconfig */,
+				31519DC89E8C59A1CD3AE0AA /* Shared.xcconfig */,
+				4D5F502CF336DFF7F6AE5EC3 /* Debug.xcconfig */,
+				B863CD0EFC510C4E87DB4D3B /* Release.xcconfig */,
+				8B24EF8E369CAB015547FB85 /* App.xcconfig */,
+				347E468448E0A8107D7B0EC6 /* Widget.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		45316B45CB436116EC434408 /* MealsKit */ = {
+			isa = PBXGroup;
+			children = (
+				C41C41AB8C9931888715F43C /* MealModels.swift */,
+				306671B3DDB4243E00B312C0 /* AppGroupStore.swift */,
+				6394DD763ACB67478C901556 /* Theme.swift */,
+				8BE1AD557FF3E6330C225AB2 /* Assets.xcassets */,
+			);
+			path = MealsKit;
+			sourceTree = "<group>";
+		};
+		4B48653AF5A0B20C6ED00351 /* MealsCompanion */ = {
+			isa = PBXGroup;
+			children = (
+				D71921E64B2FAB8E357024F9 /* MealsCompanionApp.swift */,
+				4C90BF307703E941D447B992 /* CloudKitMealFeed.swift */,
+				525203B088ECC46965CAFAC4 /* RootView.swift */,
+				56D9241E0A5DFEDAF6D02F8B /* PairingView.swift */,
+				8464F8D1E0E769AF221590C9 /* MealFeedView.swift */,
+				05C13A4EF0DBD8A59B35AF8B /* SettingsView.swift */,
+				DE3308CBEC6A3142E9CC9361 /* Assets.xcassets */,
+				C6A79C1BA590FC57A817B029 /* Info.plist */,
+				C325985ED90AA7600F8B020D /* MealsCompanion.entitlements */,
+				7FF520638BFE476E7DCD485C /* PrivacyInfo.xcprivacy */,
+			);
+			path = MealsCompanion;
+			sourceTree = "<group>";
+		};
+		237ED2667819882798ED7400 /* MealsWidget */ = {
+			isa = PBXGroup;
+			children = (
+				C73191E57F709379AD1CB829 /* MealsWidget.swift */,
+				43D1B406D84CBB9B79C452C8 /* Assets.xcassets */,
+				7578703AC2A8FB20583832A5 /* Info.plist */,
+				BE8A3382CE9302457DB090B9 /* MealsWidget.entitlements */,
+				EF548DEE8C8AC4C2DBD7243E /* PrivacyInfo.xcprivacy */,
+			);
+			path = MealsWidget;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CCD1BDFE40AA20836710EC01 /* MealsCompanion */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6D8FB42965893BD12EA629B4 /* Build configuration list for PBXNativeTarget "MealsCompanion" */;
+			buildPhases = (
+				C49C65CF576633FC709B90A7 /* Sources */,
+				EF16F7BCB74D19EF18CC1216 /* Frameworks */,
+				EA0799CD6FB8985E3A9B6E32 /* Resources */,
+				698FBDDE4AA5C53470246104 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DE58E2B17C19600779694943 /* PBXTargetDependency */,
+			);
+			name = MealsCompanion;
+			productName = Meals;
+			productReference = 5718BA8B2965F0F686C8E55B /* Meals.app */;
+			productType = "com.apple.product-type.application";
+		};
+		ADEAF5E167D4943BE484764E /* MealsWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 850E3A8F30EA02F7B660FB07 /* Build configuration list for PBXNativeTarget "MealsWidget" */;
+			buildPhases = (
+				5A4E37A16AD5AA43DBABB17F /* Sources */,
+				CE6AE36FF6C4FF3C1CD7E735 /* Frameworks */,
+				EE75F105C59CE9EC2C99C220 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MealsWidget;
+			productName = MealsWidget;
+			productReference = 1B57B0C87A58442C489D3141 /* MealsWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					CCD1BDFE40AA20836710EC01 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					ADEAF5E167D4943BE484764E = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = B21C1D195CCB6F2828E1C10C /* Build configuration list for PBXProject "MealsCompanion" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = BDE88D77EBDC01774960BE71;
+			productRefGroup = 4FDE57E4B72FFCEE306CEB0F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CCD1BDFE40AA20836710EC01 /* MealsCompanion */,
+				ADEAF5E167D4943BE484764E /* MealsWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EA0799CD6FB8985E3A9B6E32 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				34136F0C76501ECBE6B48914 /* Assets.xcassets in Resources */,
+				5C9E6E8858AAC9D568FFDA9A /* Assets.xcassets in Resources */,
+				431DD5C5E0685DD232BE33ED /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EE75F105C59CE9EC2C99C220 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B6B8E840EA2A31D8EF54A98 /* Assets.xcassets in Resources */,
+				1D807DF42C538D2EFC8DDA28 /* Assets.xcassets in Resources */,
+				C4A76B4A767A097F81F245D1 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C49C65CF576633FC709B90A7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				467FEC1E4D8F8701141711CF /* MealModels.swift in Sources */,
+				1479FDFF7A6907B5F9BFA832 /* AppGroupStore.swift in Sources */,
+				BA399CFB5E23991CBEF666EC /* Theme.swift in Sources */,
+				D1D7E48ECF0783FE2DB79B19 /* MealsCompanionApp.swift in Sources */,
+				0FC66E060F6B1FF5273D346C /* CloudKitMealFeed.swift in Sources */,
+				3974BDD66188975E0A1AD6D7 /* RootView.swift in Sources */,
+				B0C6181992B362D2C7610BD8 /* PairingView.swift in Sources */,
+				CC3CD54660F5AABA6B944C5F /* MealFeedView.swift in Sources */,
+				571842371DEF5D08BB8E7BC8 /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A4E37A16AD5AA43DBABB17F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				82799BF11C97BB134A17C7C2 /* MealModels.swift in Sources */,
+				36EAE973BBC2C30EF595E919 /* AppGroupStore.swift in Sources */,
+				72670254952ADCE311B520E5 /* Theme.swift in Sources */,
+				70A30EA72F6FA929808C87D7 /* MealsWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DE58E2B17C19600779694943 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = ADEAF5E167D4943BE484764E /* MealsWidget */;
+			targetProxy = D799BAE6088A90139B415FCC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5E8ACABCCBE1DB5D311988C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D5F502CF336DFF7F6AE5EC3 /* Debug.xcconfig */;
+			buildSettings = {
+
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+			};
+			name = Debug;
+		};
+		F84FD35CA8548076F2B51EDF /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B863CD0EFC510C4E87DB4D3B /* Release.xcconfig */;
+			buildSettings = {
+
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				MTL_ENABLE_DEBUG_INFO = NO;
+			};
+			name = Release;
+		};
+		9303EFBCAFCD82C17933C9EB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8B24EF8E369CAB015547FB85 /* App.xcconfig */;
+			buildSettings = {
+				APS_ENVIRONMENT = development;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_PREVIEWS = YES;
+			};
+			name = Debug;
+		};
+		0F8B4C7FB77C768D3A78A504 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8B24EF8E369CAB015547FB85 /* App.xcconfig */;
+			buildSettings = {
+				APS_ENVIRONMENT = production;
+				CODE_SIGN_STYLE = Automatic;
+			};
+			name = Release;
+		};
+		B2449CC5E4C110B28DB6F50B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 347E468448E0A8107D7B0EC6 /* Widget.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+			};
+			name = Debug;
+		};
+		A1DC914377F49283DE8E215A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 347E468448E0A8107D7B0EC6 /* Widget.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B21C1D195CCB6F2828E1C10C /* Build configuration list for PBXProject "MealsCompanion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5E8ACABCCBE1DB5D311988C9 /* Debug */,
+				F84FD35CA8548076F2B51EDF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6D8FB42965893BD12EA629B4 /* Build configuration list for PBXNativeTarget "MealsCompanion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9303EFBCAFCD82C17933C9EB /* Debug */,
+				0F8B4C7FB77C768D3A78A504 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		850E3A8F30EA02F7B660FB07 /* Build configuration list for PBXNativeTarget "MealsWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2449CC5E4C110B28DB6F50B /* Debug */,
+				A1DC914377F49283DE8E215A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}

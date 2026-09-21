@@ -1,0 +1,23 @@
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.hmap
+
+# Build
+.build/
+.swiftpm/
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Local team override (committed default is Config/Team.xcconfig)
+Config/Team.local.xcconfig
+
+# OS
+.DS_Store
+*.swp
+*~

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CKSharingSupported</key>
+	<true/>
+	<key>MealsAppGroupIdentifier</key>
+	<string>$(MEALS_APP_GROUP)</string>
+	<key>MealsCloudKitContainerIdentifier</key>
+	<string>$(CLOUDKIT_CONTAINER_IDENTIFIER)</string>
+	<key>NSCloudKitSharingUsageDescription</key>
+	<string>Meals uses iCloud sharing so you can see photographed meals. Glucose, insulin, and pump data are not included.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Optional alerts when a new meal photo arrives. Notifications stay off unless you turn them on. The Home Screen widget is the default way to see meals.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+</dict>
+</plist>

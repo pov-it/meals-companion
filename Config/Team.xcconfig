@@ -1,0 +1,18 @@
+// Team + bundle identifiers for Meals Companion.
+//
+// DEVELOPMENT_TEAM is the 10-character Apple Developer Team ID
+// (Apple Developer → Membership → Team ID). The same team signs this app.
+//
+// Optional override: copy this file to Team.local.xcconfig (gitignored)
+// and change Shared.xcconfig to `#include "Team.local.xcconfig"` if you
+// do not want a team id in git. Committed default is the real team.
+//
+// Resolved identifiers (DEVELOPMENT_TEAM = Q6QCL8J6FN):
+//   App bundle ID:        org.pov-it.Q6QCL8J6FN.meals
+//   Widget bundle ID:     org.pov-it.Q6QCL8J6FN.meals.widget
+//   App Group:            group.org.pov-it.Q6QCL8J6FN.meals
+//   CloudKit container:   iCloud.org.pov-it.Q6QCL8J6FN.meals
+//
+// Those identifiers already exist on the developer portal.
+
+DEVELOPMENT_TEAM = Q6QCL8J6FN
