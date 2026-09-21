@@ -1,0 +1,191 @@
+# frozen_string_literal: true
+
+default_platform(:ios)
+
+TEAMID = ENV["TEAMID"]
+GH_PAT = ENV["GH_PAT"]
+GITHUB_WORKSPACE = ENV["GITHUB_WORKSPACE"] || Dir.pwd
+GITHUB_REPOSITORY_OWNER = ENV["GITHUB_REPOSITORY_OWNER"]
+FASTLANE_KEY_ID = ENV["FASTLANE_KEY_ID"]
+FASTLANE_ISSUER_ID = ENV["FASTLANE_ISSUER_ID"]
+FASTLANE_KEY = ENV["FASTLANE_KEY"]
+ENV["FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT"] = "120"
+
+def meals_bundle_id
+  UI.user_error!("TEAMID secret is required") if TEAMID.to_s.empty?
+  "org.pov-it.#{TEAMID}.meals"
+end
+
+def widget_bundle_id
+  "#{meals_bundle_id}.widget"
+end
+
+def meals_app_group
+  "group.#{meals_bundle_id}"
+end
+
+def meals_icloud_container
+  "iCloud.#{meals_bundle_id}"
+end
+
+# Inject real TEAMID into Config/Team.xcconfig for this CI run only (not committed).
+def inject_team_id!
+  path = File.join(GITHUB_WORKSPACE, "Config", "Team.xcconfig")
+  UI.user_error!("Missing #{path}") unless File.exist?(path)
+  contents = File.read(path)
+  updated = contents.gsub(/^DEVELOPMENT_TEAM\s*=\s*.*$/, "DEVELOPMENT_TEAM = #{TEAMID}")
+  File.write(path, updated)
+  UI.message("Injected DEVELOPMENT_TEAM=#{TEAMID} into Config/Team.xcconfig for this run")
+end
+
+def set_project_build_number!(build_number)
+  path = File.join(GITHUB_WORKSPACE, "Config", "Shared.xcconfig")
+  contents = File.read(path)
+  updated = contents.gsub(/^CURRENT_PROJECT_VERSION\s*=\s*.*$/, "CURRENT_PROJECT_VERSION = #{build_number}")
+  File.write(path, updated)
+  UI.message("Set CURRENT_PROJECT_VERSION=#{build_number} in Config/Shared.xcconfig for this run")
+end
+
+def connect_api_key
+  app_store_connect_api_key(
+    key_id: FASTLANE_KEY_ID,
+    issuer_id: FASTLANE_ISSUER_ID,
+    key_content: FASTLANE_KEY
+  )
+end
+
+def match_git_basic_auth
+  Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}")
+end
+
+platform :ios do
+  desc "Register App IDs + capabilities for Meals Companion (one-time / when IDs change)"
+  lane :identifiers do
+    setup_ci if ENV["CI"]
+    ENV["MATCH_READONLY"] = false.to_s
+    bundle_id = meals_bundle_id
+    widget_id = widget_bundle_id
+
+    connect_api_key
+
+    def configure_bundle_id(name, identifier, capabilities)
+      bundle = Spaceship::ConnectAPI::BundleId.find(identifier) || Spaceship::ConnectAPI::BundleId.create(
+        name: name,
+        identifier: identifier,
+        platform: "IOS"
+      )
+      existing = bundle.get_capabilities.map(&:capability_type)
+      capabilities.reject { |c| existing.include?(c) }.each do |cap|
+        bundle.create_capability(cap)
+      end
+    end
+
+    # App: App Groups + iCloud (CloudKit) + Push (silent widget refresh)
+    configure_bundle_id("Meals Companion", bundle_id, [
+      Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS,
+      Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
+      Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS
+    ])
+
+    # Widget: App Groups only
+    configure_bundle_id("Meals Companion Widget", widget_id, [
+      Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS
+    ])
+
+    UI.important("Bundle IDs ensured: #{bundle_id}, #{widget_id}")
+    UI.important("Still create/link App Group #{meals_app_group} and CloudKit container #{meals_icloud_container} in the Developer portal if not already present, and create the ASC app record before TestFlight upload.")
+  end
+
+  desc "Create/update App Store provisioning profiles via Match for Meals + widget"
+  lane :certs do
+    setup_ci if ENV["CI"]
+    ENV["MATCH_READONLY"] = false.to_s
+    bundle_id = meals_bundle_id
+    widget_id = widget_bundle_id
+
+    connect_api_key
+
+    match(
+      type: "appstore",
+      force: false,
+      verbose: true,
+      git_basic_authorization: match_git_basic_auth,
+      app_identifier: [bundle_id, widget_id]
+    )
+  end
+
+  desc "Build and archive MealsCompanion + MealsWidget for App Store / TestFlight"
+  lane :build_meals do
+    setup_ci if ENV["CI"]
+    inject_team_id!
+
+    bundle_id = meals_bundle_id
+    widget_id = widget_bundle_id
+    project = File.join(GITHUB_WORKSPACE, "MealsCompanion.xcodeproj")
+
+    update_project_team(
+      path: project,
+      teamid: TEAMID
+    )
+
+    api_key = connect_api_key
+
+    previous_build_number = latest_testflight_build_number(
+      app_identifier: bundle_id,
+      api_key: api_key,
+      initial_build_number: 0
+    )
+    current_build_number = previous_build_number.to_i + 1
+    set_project_build_number!(current_build_number)
+
+    match(
+      type: "appstore",
+      git_basic_authorization: match_git_basic_auth,
+      app_identifier: [bundle_id, widget_id]
+    )
+
+    mapping = Actions.lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]
+
+    update_code_signing_settings(
+      path: project,
+      profile_name: mapping[bundle_id],
+      code_sign_identity: "iPhone Distribution",
+      targets: ["MealsCompanion"]
+    )
+
+    update_code_signing_settings(
+      path: project,
+      profile_name: mapping[widget_id],
+      code_sign_identity: "iPhone Distribution",
+      targets: ["MealsWidget"]
+    )
+
+    gym(
+      export_method: "app-store",
+      scheme: "MealsCompanion",
+      project: project,
+      output_name: "MealsCompanion.ipa",
+      configuration: "Release",
+      destination: "generic/platform=iOS",
+      buildlog_path: "buildlog"
+    )
+
+    copy_artifacts(
+      target_path: "artifacts",
+      artifacts: ["*.mobileprovision", "*.ipa", "*.dSYM.zip"]
+    )
+  end
+
+  desc "Upload MealsCompanion.ipa to TestFlight"
+  lane :release do
+    api_key = connect_api_key
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_submission: false,
+      ipa: "MealsCompanion.ipa",
+      skip_waiting_for_build_processing: true,
+      changelog: "#{git_branch} #{last_git_commit[:abbreviated_commit_hash]}"
+    )
+  end
+end

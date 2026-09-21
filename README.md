@@ -113,16 +113,70 @@ Do **not** add her to Trio’s TestFlight group. Create a separate App Store Con
 3. **Limit her app access** to **Meals Companion only**. Uncheck Trio and every other app. This is the step that keeps Trio private.
 4. Open the **Meals Companion** app record (not Trio) → **TestFlight** → **Internal Testing**.
 5. Create a group (e.g. `Mayee`) and add her.
-6. Archive **this** project in Xcode (Release, team `Q6QCL8J6FN`) and upload the build. Bump `CURRENT_PROJECT_VERSION` in `Config/Shared.xcconfig` for each upload. Wait for processing.
+6. Upload a build via **browser build** (below) or Xcode (Release, team `Q6QCL8J6FN`). CI bumps `CURRENT_PROJECT_VERSION` from the latest TestFlight build number; for manual Xcode uploads bump it in `Config/Shared.xcconfig`. Wait for processing.
 7. She accepts the App Store Connect user invite, installs **TestFlight**, and installs **Meals** — not Trio.
 
 Internal testers are App Store Connect users. If you skip “limit app access”, she may see Trio in ASC. External TestFlight is a different path (no ASC user); this README follows the requested internal-tester flow.
+
+## Browser build / TestFlight (GitHub Actions — no Mac required)
+
+Pattern copied from `pov-it/Trio` (`4. Build Trio`: `macos-26` + Fastlane + Match + App Store Connect API key). This repo has **no** glucose/Nightscout secrets.
+
+### Secrets (same names as Trio)
+
+Copy these from the Trio repo (or org) into **this** repo’s Actions secrets if they are not already available at org level:
+
+| Secret | Purpose |
+| --- | --- |
+| `TEAMID` | 10-character Apple Team ID (injected into `Config/Team.xcconfig` at CI time; not committed) |
+| `GH_PAT` | Classic PAT with `repo` (+ `workflow` preferred) to read/write `pov-it/Match-Secrets` |
+| `MATCH_PASSWORD` | Match encryption password (same as Trio) |
+| `FASTLANE_KEY_ID` | App Store Connect API key id |
+| `FASTLANE_ISSUER_ID` | App Store Connect issuer id |
+| `FASTLANE_KEY` | API key `.p8` contents (PEM body) |
+
+Match storage is `https://github.com/<owner>/Match-Secrets.git` (same repo Trio uses). New Meals bundle IDs get **new provisioning profiles** on the existing distribution certificate — you do **not** need to nuke Trio’s certs.
+
+### One-time Apple / Match setup (expected before first green build)
+
+1. **App Store Connect app** for Meals Companion must exist with bundle ID `org.pov-it.<TEAMID>.meals` (create manually in ASC; the upload lane does not create the app record).
+2. Run **Actions → “Add Meals Identifiers” → Run workflow** once. That lane:
+   - registers App IDs `…meals` and `…meals.widget` (App Groups / iCloud / Push on the app; App Groups on the widget);
+   - runs Match to create App Store profiles into `Match-Secrets`.
+3. In the Developer portal, confirm App Group `group.org.pov-it.<TEAMID>.meals` and CloudKit container `iCloud.org.pov-it.<TEAMID>.meals` are created and linked (Spaceship capability flags alone are not always enough for group/container linkage).
+4. **Enable the workflow files first** (one-time): this PR ships them under `ci/github-workflows/` because a GitHub OAuth token without the `workflow` scope cannot create `.github/workflows/*.yml`. With a PAT/`gh` auth that includes `workflow`:
+
+```bash
+mkdir -p .github/workflows
+cp ci/github-workflows/*.yml .github/workflows/
+git add .github/workflows && git commit -m "Enable browser-build workflows" && git push
+```
+
+Then run **Actions → “Build Meals Companion” → Run workflow**, or:
+
+```bash
+gh workflow run "Build Meals Companion" --repo pov-it/meals-companion --ref <branch>
+```
+
+`Config/Team.xcconfig` stays as `DEVELOPMENT_TEAM = TEAMID` in git. The Fastlane `build_meals` lane rewrites it in the runner workspace from the `TEAMID` secret.
+
+### What fails on first run (honest)
+
+| Failure | Cause | Fix |
+| --- | --- | --- |
+| Secrets empty / auth errors | Secrets not copied to this repo | Copy the six secrets from Trio / org |
+| Match cannot find profiles | Meals App IDs never registered in Match | Run **Add Meals Identifiers** first |
+| `latest_testflight_build_number` / upload errors about unknown app | No ASC app for `org.pov-it.<TEAMID>.meals` | Create the ASC app record with that exact bundle ID |
+| Code sign / entitlement errors for App Groups or iCloud | Group/container not linked on the App ID | Finish portal linkage (see Apple setup below) |
+| Upload succeeds but CloudKit dead on device | Schema still Development-only | Deploy CloudKit schema to Production |
+
+This README does **not** claim a successful TestFlight upload has been run from CI yet — trigger the workflow after secrets + ASC app + identifiers exist.
 
 ## Apple / CloudKit setup Marijn must finish
 
 This repo is structural. It will not talk to iCloud until the Apple-side work exists. None of that can be done from git.
 
-1. **Paid Apple Developer Program** on team `Q6QCL8J6FN` (already set in `Config/Team.xcconfig`).
+1. **Paid Apple Developer Program** on team `Q6QCL8J6FN` (already set in `Config/Team.xcconfig`; CI also injects `TEAMID` secret over that line for the runner workspace).
 2. Developer portal identifiers already exist for this team:
    - App ID `org.pov-it.Q6QCL8J6FN.meals` with App Groups, iCloud (CloudKit), Push Notifications.
    - App ID `org.pov-it.Q6QCL8J6FN.meals.widget` with the same App Group (widget does not need CloudKit).
@@ -131,7 +185,7 @@ This repo is structural. It will not talk to iCloud until the Apple-side work ex
 3. Xcode: select team `Q6QCL8J6FN`, let it regenerate capabilities if it offers to. Confirm entitlements still use the xcconfig variables.
 4. **CloudKit Dashboard**: add record types `Meal` and `MealFeed` with the fields above if they are not already there, mark `Meal` as **queryable**, create `MealsZone` (or let Trio create it), and **Deploy Schema to Production** before TestFlight. Development-environment CloudKit does not serve TestFlight/App Store builds.
 5. **Trio publisher work (not in this repo):** add this meals container as a *second* CloudKit container on Trio (leave glucose in Trio’s existing container), write only `Meal` / `MealFeed` records, create the `CKShare`, invite Mayee. Until that ships, this app can pair in UI form only.
-6. Archive and upload a TestFlight build of **this** app when you are ready. This repo does not record TestFlight or build status.
+6. Upload a TestFlight build of **this** app via the browser-build workflow above, or Xcode.
 7. On her phone: iCloud signed in, install Meals, accept the share, add the widget.
 
 Honest gaps:
@@ -153,4 +207,6 @@ MealsKit/                Shared meal snapshot + theme
 MealsCompanion/          SwiftUI app + CloudKit accept/fetch
 MealsWidget/             WidgetKit extension
 MealsCompanion.xcodeproj
+fastlane/                Match + build_meals + TestFlight upload
+ci/github-workflows/     Build Meals Companion, Add Meals Identifiers (copy to .github/workflows/)
 ```

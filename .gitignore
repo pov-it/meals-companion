@@ -21,3 +21,15 @@ Config/Team.local.xcconfig
 .DS_Store
 *.swp
 *~
+
+# Ruby / fastlane (CI)
+vendor/bundle/
+.bundle/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output/
+fastlane/new_certificate_needed.txt
+artifacts/
+buildlog/
+*.mobileprovision
