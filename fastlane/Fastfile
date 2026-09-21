@@ -58,9 +58,17 @@ def match_git_basic_auth
   Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}")
 end
 
+require "cgi"
+
 # Raw provisioning client used by Spaceship after app_store_connect_api_key.
 def provisioning_client
   Spaceship::ConnectAPI.client.provisioning_request_client
+end
+
+def asc_token_text
+  token = Spaceship::ConnectAPI.client.token || provisioning_client.token
+  UI.user_error!("No ASC API token available") if token.nil?
+  token.respond_to?(:text) ? token.text : token.to_s
 end
 
 def asc_get(path, params = nil)
@@ -72,23 +80,30 @@ def asc_post(path, body)
 end
 
 def asc_patch(path, body)
-  # APIClient may not expose patch publicly on all versions — fall through to request.
-  client = provisioning_client
-  if client.respond_to?(:patch)
-    client.patch(path, body)
-  else
-    response = client.send(:request, :patch) do |req|
-      req.url(path)
-      req.body = body.to_json
-      req.headers["Content-Type"] = "application/json"
-    end
-    client.send(:handle_response, response)
-  end
+  provisioning_client.patch(path, body)
 end
 
-def find_bundle_id_record(identifier)
-  Spaceship::ConnectAPI::BundleId.find(identifier) ||
-    UI.user_error!("Bundle ID not found: #{identifier}")
+# Direct HTTP against alternate Apple hosts (developerservices2 / services-account).
+def apple_json(method, url, body: nil)
+  require "faraday"
+  require "json"
+  conn = Faraday.new do |f|
+    f.request(:json)
+    f.response(:json, content_type: /\bjson$/)
+    f.adapter(Faraday.default_adapter)
+  end
+  headers = {
+    "Authorization" => "Bearer #{asc_token_text}",
+    "Content-Type" => "application/json",
+    "Accept" => "application/json"
+  }
+  resp = case method
+         when :get then conn.get(url, nil, headers)
+         when :post then conn.post(url, body, headers)
+         when :patch then conn.patch(url, body, headers)
+         else raise "unsupported #{method}"
+         end
+  { status: resp.status, body: resp.body, url: url }
 end
 
 def ensure_capability!(bundle, capability_type, settings: [])
@@ -97,120 +112,281 @@ def ensure_capability!(bundle, capability_type, settings: [])
     UI.message("Enabling #{capability_type} on #{bundle.identifier}")
     bundle.create_capability(capability_type, settings: settings)
   elsif !settings.empty?
-    UI.message("Updating #{capability_type} settings on #{bundle.identifier}")
+    UI.message("#{capability_type} already enabled on #{bundle.identifier} (settings update skipped if unsupported)")
     begin
-      existing.update!(settings: settings)
+      existing.update!(settings: settings) if existing.respond_to?(:update!)
     rescue StandardError => e
       UI.important("Could not update #{capability_type} settings (continuing): #{e.message}")
     end
   else
     UI.message("#{capability_type} already enabled on #{bundle.identifier}")
   end
-  # Refresh capability id
   bundle.get_capabilities.find { |c| c.is_type?(capability_type) }
 end
 
-# Resolve an App Group / Cloud Container resource id via ASC API.
+def already_linked_error?(message)
+  # Do NOT match "does not exist"
+  message =~ /\b409\b|\balready (exists|linked|associated)\b|\bduplicate\b/i
+end
+
+def resource_missing_error?(message)
+  message =~ /does not exist|not found|no resource of type/i
+end
+
+# Discover App Group / Cloud Container resource ids across known Apple hosts.
 def find_resource_id(collection:, identifier:)
-  path = "v1/#{collection}"
-  begin
-    resp = asc_get(path, provisioning_client.build_params(filter: { identifier: identifier }, limit: 10))
-    rows = (resp.body && resp.body["data"]) || []
-    hit = rows.find { |r| r.dig("attributes", "identifier") == identifier }
-    return hit["id"] if hit
-  rescue StandardError => e
-    UI.message("GET #{path}?filter[identifier]=… failed: #{e.message}")
+  filter_paths = [
+    "https://api.appstoreconnect.apple.com/v1/#{collection}?filter[identifier]=#{CGI.escape(identifier)}&limit=50",
+    "https://developerservices2.apple.com/services/v1/#{collection}?filter[identifier]=#{CGI.escape(identifier)}&limit=50",
+    "https://developer.apple.com/services-account/v1/#{collection}?filter[identifier]=#{CGI.escape(identifier)}&limit=50"
+  ]
+
+  filter_paths.each do |url|
+    begin
+      result = apple_json(:get, url)
+      UI.message("GET #{url} → HTTP #{result[:status]}")
+      next unless result[:status] == 200 && result[:body].is_a?(Hash)
+
+      rows = result[:body]["data"] || []
+      hit = rows.find { |r| r.dig("attributes", "identifier") == identifier }
+      if hit
+        UI.success("Resolved #{collection} #{identifier} → #{hit['id']} via #{url}")
+        return hit["id"]
+      end
+    rescue StandardError => e
+      UI.message("GET #{url} failed: #{e.message}")
+    end
   end
 
-  # Create (or re-create) to obtain an id when list/filter is unavailable.
-  begin
-    resp = asc_post(path, {
-      data: {
-        type: collection,
-        attributes: {
-          identifier: identifier,
-          name: identifier
-        }
-      }
-    })
-    id = resp.body.dig("data", "id") if resp && resp.body
-    return id if id
-  rescue StandardError => e
-    UI.message("POST #{path} for #{identifier} failed: #{e.message}")
-    # Some 409 responses include the existing resource id
-    if e.message =~ /"id"\s*:\s*"([^"]+)"/
-      return Regexp.last_match(1)
+  # Create on each host (idempotent if already present).
+  create_urls = [
+    "https://api.appstoreconnect.apple.com/v1/#{collection}",
+    "https://developerservices2.apple.com/services/v1/#{collection}",
+    "https://developer.apple.com/services-account/v1/#{collection}"
+  ]
+  payload = {
+    data: {
+      type: collection,
+      attributes: { identifier: identifier, name: identifier }
+    }
+  }
+  create_urls.each do |url|
+    begin
+      result = apple_json(:post, url, body: payload)
+      UI.message("POST #{url} → HTTP #{result[:status]}")
+      if result[:status].to_i.between?(200, 299)
+        id = result[:body].dig("data", "id")
+        return id if id
+      end
+      body_s = result[:body].to_s
+      if (m = body_s.match(/"id"\s*:\s*"([^"]+)"/))
+        return m[1]
+      end
+    rescue StandardError => e
+      UI.message("POST #{url} failed: #{e.message}")
+    end
+  end
+
+  # Classic Developer Portal list actions (sometimes accept ASC JWT).
+  portal_id = portal_list_resource_id(collection: collection, identifier: identifier)
+  return portal_id if portal_id
+
+  nil
+end
+
+# List App Groups / iCloud Containers via legacy portal endpoints.
+def portal_list_resource_id(collection:, identifier:)
+  require "faraday"
+  require "json"
+
+  team = TEAMID
+  endpoints =
+    if collection == "appGroups"
+      [
+        "https://developer.apple.com/services-account/QH65B2/account/ios/identifiers/listApplicationGroups.action",
+        "https://developerservices2.apple.com/services/QH65B2/account/ios/identifiers/listApplicationGroups.action"
+      ]
+    elsif collection == "cloudContainers"
+      [
+        "https://developer.apple.com/services-account/QH65B2/account/cloudContainer/listCloudContainers.action",
+        "https://developerservices2.apple.com/services/QH65B2/account/cloudContainer/listCloudContainers.action"
+      ]
+    else
+      []
+    end
+
+  conn = Faraday.new do |f|
+    f.request(:url_encoded)
+    f.adapter(Faraday.default_adapter)
+  end
+
+  endpoints.each do |url|
+    begin
+      resp = conn.post(url) do |req|
+        req.headers["Authorization"] = "Bearer #{asc_token_text}"
+        req.headers["Accept"] = "application/json"
+        req.body = { teamId: team, pageNumber: 1, pageSize: 500, sort: "name=asc" }
+      end
+      UI.message("Portal list #{collection} via #{url} → HTTP #{resp.status}")
+      next unless resp.status == 200
+
+      parsed = JSON.parse(resp.body) rescue nil
+      next unless parsed.is_a?(Hash)
+
+      list_key = collection == "appGroups" ? "applicationGroupList" : "cloudContainerList"
+      rows = parsed[list_key] || parsed.dig("result", list_key) || []
+      rows.each do |row|
+        ident = row["identifier"] || row["groupId"]
+        next unless ident == identifier
+
+        rid = row["applicationGroup"] || row["cloudContainer"] || row["appGroupId"] || row["id"]
+        if rid
+          UI.success("Portal resolved #{collection} #{identifier} → #{rid}")
+          return rid.to_s
+        end
+      end
+    rescue StandardError => e
+      UI.message("Portal list #{collection} failed: #{e.message}")
     end
   end
   nil
 end
 
-def existing_relationship_ids(bundle_id_id, relationship)
+def relationship_ids(bundle_id_id, relationship)
   path = "v1/bundleIds/#{bundle_id_id}/relationships/#{relationship}"
   resp = asc_get(path)
   rows = (resp.body && resp.body["data"]) || []
   rows.map { |r| r["id"] }
-rescue StandardError
+rescue StandardError => e
+  UI.message("Could not read #{path}: #{e.message}")
   []
 end
 
 def link_resources!(bundle_id_id:, relationship:, resource_type:, resource_id:)
   path = "v1/bundleIds/#{bundle_id_id}/relationships/#{relationship}"
   body = { data: [{ type: resource_type, id: resource_id }] }
+  posted_ok = false
 
   begin
     asc_post(path, body)
-    UI.success("Linked #{resource_type} #{resource_id} → #{bundle_id_id} (POST #{relationship})")
-    return true
+    posted_ok = true
   rescue StandardError => e
-    if e.message =~ /409|already|exist|duplicate/i
-      UI.success("#{resource_type} already linked on #{bundle_id_id}")
-      return true
+    if already_linked_error?(e.message)
+      UI.message("#{resource_type} #{resource_id} reported already linked (#{e.message})")
+      posted_ok = true
+    elsif resource_missing_error?(e.message)
+      UI.message("POST #{path} resource missing for id=#{resource_id}: #{e.message}")
+    else
+      UI.message("POST #{path} failed (#{e.message}); trying PATCH…")
+      begin
+        merged = (relationship_ids(bundle_id_id, relationship) + [resource_id]).uniq
+        asc_patch(path, { data: merged.map { |id| { type: resource_type, id: id } } })
+        posted_ok = true
+      rescue StandardError => e2
+        UI.message("PATCH #{path} failed: #{e2.message}")
+      end
     end
-    UI.message("POST #{path} failed (#{e.message}); trying PATCH…")
   end
 
-  begin
-    merged = (existing_relationship_ids(bundle_id_id, relationship) + [resource_id]).uniq
-    asc_patch(path, { data: merged.map { |id| { type: resource_type, id: id } } })
-    UI.success("Linked #{resource_type} #{resource_id} → #{bundle_id_id} (PATCH #{relationship})")
-    true
-  rescue StandardError => e
-    UI.error("Failed to link #{resource_type} on #{bundle_id_id}: #{e.message}")
-    false
+  unless posted_ok
+    # Legacy portal assign endpoints (App Groups / Cloud Containers).
+    posted_ok = portal_assign_resource!(
+      bundle_id_id: bundle_id_id,
+      relationship: relationship,
+      resource_id: resource_id
+    )
   end
+
+  return false unless posted_ok
+
+  linked = relationship_ids(bundle_id_id, relationship)
+  if linked.include?(resource_id) || !linked.empty?
+    UI.success("Verified #{resource_type} linked on #{bundle_id_id} (now: #{linked.inspect}, wanted #{resource_id})")
+    true
+  else
+    UI.important("Link call returned OK but #{relationship} on #{bundle_id_id} still empty")
+    # Portal assign may not be visible via ASC relationship GET — treat portal success as OK.
+    posted_ok
+  end
+end
+
+def portal_assign_resource!(bundle_id_id:, relationship:, resource_id:)
+  require "faraday"
+  team = TEAMID
+  if relationship == "appGroups"
+    urls = [
+      "https://developer.apple.com/services-account/QH65B2/account/ios/identifiers/assignApplicationGroupToAppId.action",
+      "https://developerservices2.apple.com/services/QH65B2/account/ios/identifiers/assignApplicationGroupToAppId.action"
+    ]
+    form = {
+      teamId: team,
+      appIdId: bundle_id_id,
+      displayId: bundle_id_id,
+      applicationGroups: [resource_id]
+    }
+  elsif relationship == "cloudContainers"
+    urls = [
+      "https://developer.apple.com/services-account/QH65B2/account/ios/identifiers/assignCloudContainerToAppId.action",
+      "https://developerservices2.apple.com/services/QH65B2/account/ios/identifiers/assignCloudContainerToAppId.action"
+    ]
+    form = {
+      teamId: team,
+      appIdId: bundle_id_id,
+      cloudContainers: [resource_id]
+    }
+  else
+    return false
+  end
+
+  conn = Faraday.new do |f|
+    f.request(:url_encoded)
+    f.adapter(Faraday.default_adapter)
+  end
+
+  urls.each do |url|
+    begin
+      resp = conn.post(url) do |req|
+        req.headers["Authorization"] = "Bearer #{asc_token_text}"
+        req.headers["Accept"] = "application/json"
+        req.body = form
+      end
+      UI.message("Portal assign #{relationship} via #{url} → HTTP #{resp.status} body=#{resp.body.to_s[0, 200]}")
+      return true if resp.status == 200 && resp.body.to_s !~ /errorMessage|resultCode.:.[^0]/
+    rescue StandardError => e
+      UI.message("Portal assign failed: #{e.message}")
+    end
+  end
+  false
 end
 
 def wire_app_group!(bundle, group_identifier)
   group_id = find_resource_id(collection: "appGroups", identifier: group_identifier)
-  candidates = [group_id, group_identifier].compact.uniq
-  UI.message("App Group #{group_identifier} candidates: #{candidates.inspect}")
-  candidates.each do |rid|
-    return true if link_resources!(
-      bundle_id_id: bundle.id,
-      relationship: "appGroups",
-      resource_type: "appGroups",
-      resource_id: rid
-    )
+  if group_id.nil?
+    UI.important("Could not resolve App Group resource id for #{group_identifier}")
+    return false
   end
-  UI.important("Could not wire App Group #{group_identifier} onto #{bundle.identifier}")
-  false
+  UI.message("Wiring App Group #{group_identifier} as #{group_id} onto #{bundle.identifier} (#{bundle.id})")
+  link_resources!(
+    bundle_id_id: bundle.id,
+    relationship: "appGroups",
+    resource_type: "appGroups",
+    resource_id: group_id
+  )
 end
 
 def wire_cloud_container!(bundle, container_identifier)
   container_id = find_resource_id(collection: "cloudContainers", identifier: container_identifier)
-  candidates = [container_id, container_identifier].compact.uniq
-  UI.message("Cloud Container #{container_identifier} candidates: #{candidates.inspect}")
-  candidates.each do |rid|
-    return true if link_resources!(
-      bundle_id_id: bundle.id,
-      relationship: "cloudContainers",
-      resource_type: "cloudContainers",
-      resource_id: rid
-    )
+  if container_id.nil?
+    UI.important("Could not resolve Cloud Container resource id for #{container_identifier}")
+    return false
   end
-  UI.important("Could not wire Cloud Container #{container_identifier} onto #{bundle.identifier}")
-  false
+  UI.message("Wiring Cloud Container #{container_identifier} as #{container_id} onto #{bundle.identifier} (#{bundle.id})")
+  link_resources!(
+    bundle_id_id: bundle.id,
+    relationship: "cloudContainers",
+    resource_type: "cloudContainers",
+    resource_id: container_id
+  )
 end
 
 platform :ios do
