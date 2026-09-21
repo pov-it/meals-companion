@@ -456,16 +456,18 @@ platform :ios do
     UI.important("Wiring CloudKit container #{icloud} onto #{bundle_id}")
     cloud_ok = wire_cloud_container!(app, icloud)
 
-    unless app_group_ok && widget_group_ok && cloud_ok
-      UI.user_error!(
-        "Failed to wire App Group and/or CloudKit container onto App IDs via ASC API. " \
-        "Capabilities may be enabled but specific IDs are not linked — Match profiles will lack entitlements. " \
-        "Link manually in Developer portal (Identifiers → each App ID → App Groups / iCloud Configure), then re-run."
-      )
+    if app_group_ok && widget_group_ok && cloud_ok
+      UI.success("Bundle IDs ensured and wired: #{bundle_id}, #{widget_id}")
+      UI.success("App Group #{app_group} + CloudKit #{icloud} linked via API")
+    else
+      # ASC API keys cannot list/assign App Groups or Cloud Containers (404 / session expired).
+      # After Configure in the Developer portal, Match force:true still regenerates correct profiles.
+      UI.important("ASC API could not verify App Group / CloudKit linkage.")
+      UI.important("Confirm in Developer portal, then rely on certs (force:true):")
+      UI.important("  1) #{bundle_id} → App Groups → #{app_group}; iCloud/CloudKit → #{icloud}")
+      UI.important("  2) #{widget_id} → App Groups → #{app_group}")
+      UI.user_error!("REQUIRE_API_WIRE=1 set and API linkage failed") if ENV["REQUIRE_API_WIRE"] == "1"
     end
-
-    UI.success("Bundle IDs ensured and wired: #{bundle_id}, #{widget_id}")
-    UI.success("App Group #{app_group} + CloudKit #{icloud} linked")
   end
 
   desc "Create/update App Store provisioning profiles via Match for Meals + widget"
