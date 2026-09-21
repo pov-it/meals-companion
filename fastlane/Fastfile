@@ -230,16 +230,36 @@ def portal_list_resource_id(collection:, identifier:)
       UI.message("Portal list #{collection} via #{url} → HTTP #{resp.status}")
       next unless resp.status == 200
 
-      parsed = JSON.parse(resp.body) rescue nil
-      next unless parsed.is_a?(Hash)
+      raw = resp.body.to_s
+      UI.message("Portal list body (first 500): #{raw[0, 500]}")
+      parsed = begin
+        JSON.parse(raw)
+      rescue StandardError
+        nil
+      end
 
-      list_key = collection == "appGroups" ? "applicationGroupList" : "cloudContainerList"
-      rows = parsed[list_key] || parsed.dig("result", list_key) || []
+      rows = []
+      if parsed.is_a?(Hash)
+        list_key = collection == "appGroups" ? "applicationGroupList" : "cloudContainerList"
+        rows = parsed[list_key] ||
+               parsed.dig("result", list_key) ||
+               parsed.dig("data", list_key) ||
+               parsed["data"] ||
+               []
+        rows = [] unless rows.is_a?(Array)
+      end
+
+      # Also accept a naked array
+      rows = parsed if parsed.is_a?(Array)
+
+      UI.message("Portal list parsed #{rows.length} rows")
       rows.each do |row|
-        ident = row["identifier"] || row["groupId"]
+        next unless row.is_a?(Hash)
+        ident = row["identifier"] || row["groupId"] || row.dig("attributes", "identifier")
+        UI.message("  row ident=#{ident.inspect} keys=#{row.keys.inspect}")
         next unless ident == identifier
 
-        rid = row["applicationGroup"] || row["cloudContainer"] || row["appGroupId"] || row["id"]
+        rid = row["applicationGroup"] || row["cloudContainer"] || row["appGroupId"] || row["id"] || row.dig("attributes", "id")
         if rid
           UI.success("Portal resolved #{collection} #{identifier} → #{rid}")
           return rid.to_s
