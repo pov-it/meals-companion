@@ -144,7 +144,15 @@ Match storage is `https://github.com/<owner>/Match-Secrets.git` (same repo Trio 
    - registers App IDs `…meals` and `…meals.widget` (App Groups / iCloud / Push on the app; App Groups on the widget);
    - runs Match to create App Store profiles into `Match-Secrets`.
 3. In the Developer portal, confirm App Group `group.org.pov-it.<TEAMID>.meals` and CloudKit container `iCloud.org.pov-it.<TEAMID>.meals` are created and linked (Spaceship capability flags alone are not always enough for group/container linkage).
-4. Then run **Actions → “Build Meals Companion” → Run workflow**, or:
+4. **Enable the workflow files first** (one-time): this PR ships them under `ci/github-workflows/` because a GitHub OAuth token without the `workflow` scope cannot create `.github/workflows/*.yml`. With a PAT/`gh` auth that includes `workflow`:
+
+```bash
+mkdir -p .github/workflows
+cp ci/github-workflows/*.yml .github/workflows/
+git add .github/workflows && git commit -m "Enable browser-build workflows" && git push
+```
+
+Then run **Actions → “Build Meals Companion” → Run workflow**, or:
 
 ```bash
 gh workflow run "Build Meals Companion" --repo pov-it/meals-companion --ref <branch>
@@ -200,5 +208,5 @@ MealsCompanion/          SwiftUI app + CloudKit accept/fetch
 MealsWidget/             WidgetKit extension
 MealsCompanion.xcodeproj
 fastlane/                Match + build_meals + TestFlight upload
-.github/workflows/       Build Meals Companion, Add Meals Identifiers
+ci/github-workflows/     Build Meals Companion, Add Meals Identifiers (copy to .github/workflows/)
 ```
