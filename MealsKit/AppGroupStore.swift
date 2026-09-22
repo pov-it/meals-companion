@@ -177,7 +177,7 @@ public enum LatestMealStore {
             id: "sample-preview",
             title: "Overnight oats",
             photographedAt: Date().addingTimeInterval(-2 * 3600),
-            ownerName: "Marijn",
+            ownerName: "Publisher",
             photoFileName: nil
         )
         if let data, let name = savePhoto(data, mealID: meal.id) {
@@ -185,7 +185,7 @@ public enum LatestMealStore {
         }
         let pairing = PairingState(
             isPaired: true,
-            ownerName: "Marijn",
+            ownerName: "Publisher",
             shareURLString: nil,
             acceptedAt: Date(),
             zoneName: MealCloudKit.zoneName,

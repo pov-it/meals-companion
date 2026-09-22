@@ -12,7 +12,7 @@ struct PairingView: View {
                     Text("See photographed meals on a widget.")
                         .font(TypeStyle.largeMealTitle)
                         .foregroundStyle(Palette.ink)
-                    Text("This app does not show glucose, insulin, or pump data. Pair with Marijn’s meal share, then add the Meals widget to your Home Screen.")
+                    Text("This app does not show glucose, insulin, or pump data. Pair with the publisher’s meal share, then add the Meals widget to your Home Screen.")
                         .font(TypeStyle.caption)
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)

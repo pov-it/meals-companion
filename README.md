@@ -1,8 +1,8 @@
 # Meals Companion
 
-A **private**, meal-only iPhone app + Home Screen (and Lock Screen) widget so Mayee can see Marijn’s photographed meals.
+A **private**, meal-only iPhone app + Home Screen (and Lock Screen) widget so the companion can see the Trio user’s photographed meals.
 
-This is not Trio. It does not show glucose, IOB, COB, insulin, carbs, or pump data. Trio does not need to be installed on her phone.
+This is not Trio. It does not show glucose, IOB, COB, insulin, carbs, or pump data. Trio does not need to be installed on the companion’s phone.
 
 Notifications default **off**. The widget is the point.
 
@@ -18,7 +18,7 @@ Open `MealsCompanion.xcodeproj` on a Mac with Xcode 15.4+ (iOS 17 SDK).
 
 ## Identifiers (TEAM / BUNDLE)
 
-All IDs are derived from `DEVELOPMENT_TEAM` in `Config/Team.xcconfig`. That file is set to Marijn’s team:
+All IDs are derived from `DEVELOPMENT_TEAM` in `Config/Team.xcconfig`. That file is set to the publisher’s team:
 
 ```xcconfig
 DEVELOPMENT_TEAM = Q6QCL8J6FN
@@ -43,25 +43,25 @@ This repo contains **no certificates, no API keys, no secrets**.
 
 Transport is **CloudKit shared database + `CKShare`**, not HTTPS. No companion server. Both phones must be signed into iCloud.
 
-1. Marijn’s **Trio** (publisher, not this repo) creates a custom zone `MealsZone`, a root `MealFeed` record, and a `CKShare` for that zone / root.
-2. He invites Mayee’s Apple ID, or sends her the iCloud share URL (Messages is fine).
-3. On her phone, in **this** app:
+1. The publisher’s **Trio** (not this repo) creates a custom zone `MealsZone`, a root `MealFeed` record, and a `CKShare` for that zone / root.
+2. The publisher invites the companion’s Apple ID, or sends the invitee the iCloud share URL (Messages is fine).
+3. On the companion’s phone, in **this** app:
    - opening the share from Messages/Mail should hit the accept-share stub (`userDidAcceptCloudKitShareWith` + paste-link screen), or
-   - she pastes `https://www.icloud.com/share/…` on the pairing screen and taps **Accept share**.
+   - the companion pastes `https://www.icloud.com/share/…` on the pairing screen and taps **Accept share**.
 4. The app reads `Meal` records from the **shared** CloudKit database, writes the latest photo/name/time into the App Group, and reloads the widget.
 
-Trio does not need to be on her phone. She must sign in to iCloud.
+Trio does not need to be on the companion’s phone. The companion must sign in to iCloud.
 
 ### Record contract (publisher must match)
 
 Container: `iCloud.org.pov-it.Q6QCL8J6FN.meals`  
-Zone: `MealsZone` (private DB on Marijn’s side, shared via `CKShare`)
+Zone: `MealsZone` (private DB on the publisher’s side, shared via `CKShare`)
 
 **`MealFeed`** (one root record, shared)
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `ownerDisplayName` | String | e.g. `Marijn` |
+| `ownerDisplayName` | String | Display name, e.g. the publisher |
 
 **`Meal`**
 
@@ -92,7 +92,7 @@ The widget reads a local App Group snapshot. It does not talk to CloudKit itself
 
 ## Notifications
 
-User-visible notifications default **OFF**. The app does not request notification permission unless she enables **Notify when a meal arrives** in Settings.
+User-visible notifications default **OFF**. The app does not request notification permission unless the companion enables **Notify when a meal arrives** in Settings.
 
 Silent CloudKit pushes (no banner, no sound) are used only to refresh the widget. That is not the same as spamming lock-screen alerts.
 
@@ -102,21 +102,21 @@ Silent CloudKit pushes (no banner, no sound) are used only to refresh the widget
 - Data lives in the couple’s iCloud share (Apple IDs), not on a developer server.
 - No Nightscout, no Libre UI, no analytics SDK, no tracking (`NSPrivacyTracking` is false).
 - App Store category is **Lifestyle**, not Medical.
-- Unpairing this phone deletes the local cache and widget snapshot. It does not delete Marijn’s originals.
+- Unpairing this phone deletes the local cache and widget snapshot. It does not delete the publisher’s originals.
 
-## TestFlight — add Mayee as an *internal* tester on **this app only**
+## TestFlight — add the companion as an *internal* tester on **this app only**
 
-Do **not** add her to Trio’s TestFlight group. Create a separate App Store Connect **app record** for Meals Companion (this bundle ID). Trio stays a different app.
+Do **not** add the invitee to Trio’s TestFlight group. Create a separate App Store Connect **app record** for Meals Companion (this bundle ID). Trio stays a different app.
 
-1. In [App Store Connect](https://appstoreconnect.apple.com) → **Users and Access** → add Mayee with her Apple ID email.
-2. Give her a role that can install internal TestFlight builds (e.g. **Marketing** or **App Manager**).
-3. **Limit her app access** to **Meals Companion only**. Uncheck Trio and every other app. This is the step that keeps Trio private.
+1. In [App Store Connect](https://appstoreconnect.apple.com) → **Users and Access** → add the internal tester with the invitee’s Apple ID email.
+2. Give the internal tester a role that can install internal TestFlight builds (e.g. **Marketing** or **App Manager**).
+3. **Limit the internal tester’s app access** to **Meals Companion only**. Uncheck Trio and every other app. This is the step that keeps Trio private.
 4. Open the **Meals Companion** app record (not Trio) → **TestFlight** → **Internal Testing**.
-5. Create a group (e.g. `Mayee`) and add her.
+5. Create a tester group (e.g. `Internal`) and add the invitee.
 6. Upload a build via **browser build** (below) or Xcode (Release, team `Q6QCL8J6FN`). CI bumps `CURRENT_PROJECT_VERSION` from the latest TestFlight build number; for manual Xcode uploads bump it in `Config/Shared.xcconfig`. Wait for processing.
-7. She accepts the App Store Connect user invite, installs **TestFlight**, and installs **Meals** — not Trio.
+7. The internal tester accepts the App Store Connect user invite, installs **TestFlight**, and installs **Meals** — not Trio.
 
-Internal testers are App Store Connect users. If you skip “limit app access”, she may see Trio in ASC. External TestFlight is a different path (no ASC user); this README follows the requested internal-tester flow.
+Internal testers are App Store Connect users. If you skip “limit app access”, the internal tester may see Trio in ASC. External TestFlight is a different path (no ASC user); this README follows the requested internal-tester flow.
 
 ## Browser build / TestFlight (GitHub Actions — no Mac required)
 
@@ -172,7 +172,7 @@ gh workflow run "Build Meals Companion" --repo pov-it/meals-companion --ref <bra
 
 This README does **not** claim a successful TestFlight upload has been run from CI yet — trigger the workflow after secrets + ASC app + identifiers exist.
 
-## Apple / CloudKit setup Marijn must finish
+## Apple / CloudKit setup the publisher must finish
 
 This repo is structural. It will not talk to iCloud until the Apple-side work exists. None of that can be done from git.
 
@@ -184,9 +184,9 @@ This repo is structural. It will not talk to iCloud until the Apple-side work ex
    - CloudKit container `iCloud.org.pov-it.Q6QCL8J6FN.meals`.
 3. Xcode: select team `Q6QCL8J6FN`, let it regenerate capabilities if it offers to. Confirm entitlements still use the xcconfig variables.
 4. **CloudKit Dashboard**: add record types `Meal` and `MealFeed` with the fields above if they are not already there, mark `Meal` as **queryable**, create `MealsZone` (or let Trio create it), and **Deploy Schema to Production** before TestFlight. Development-environment CloudKit does not serve TestFlight/App Store builds.
-5. **Trio publisher work (not in this repo):** add this meals container as a *second* CloudKit container on Trio (leave glucose in Trio’s existing container), write only `Meal` / `MealFeed` records, create the `CKShare`, invite Mayee. Until that ships, this app can pair in UI form only.
+5. **Trio publisher work (not in this repo):** add this meals container as a *second* CloudKit container on Trio (leave glucose in Trio’s existing container), write only `Meal` / `MealFeed` records, create the `CKShare`, invite the companion. Until that ships, this app can pair in UI form only.
 6. Upload a TestFlight build of **this** app via the browser-build workflow above, or Xcode.
-7. On her phone: iCloud signed in, install Meals, accept the share, add the widget.
+7. On the companion’s phone: iCloud signed in, install Meals, accept the share, add the widget.
 
 Honest gaps:
 
