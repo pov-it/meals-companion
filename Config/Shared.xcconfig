@@ -7,6 +7,12 @@ WIDGET_BUNDLE_IDENTIFIER = $(MEALS_BUNDLE_BASE).widget
 MEALS_APP_GROUP = group.$(MEALS_BUNDLE_BASE)
 CLOUDKIT_CONTAINER_IDENTIFIER = iCloud.$(MEALS_BUNDLE_BASE)
 
+// YES lets the widget fetch the newest photographed meal from CloudKit itself.
+// Prerequisite: the widget App ID has iCloud (CloudKit) with the container above
+// selected, and its Match profile was regenerated afterwards (run "Add Meals
+// Identifiers"). With NO the widget reads the App Group snapshot only.
+MEALS_WIDGET_CLOUDKIT = NO
+
 MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
 IPHONEOS_DEPLOYMENT_TARGET = 17.0
