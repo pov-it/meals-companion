@@ -12,7 +12,7 @@ Notifications default **off**. The widget is the point.
 | --- | --- |
 | `MealsCompanion` | SwiftUI app: pairing, latest meal, short history, empty states, settings |
 | `MealsWidget` | WidgetKit extension: latest photo + name + time |
-| `MealsKit/` | Shared models + App Group snapshot used by app and widget |
+| `MealsKit/` | Shared models, App Group snapshot and CloudKit fetch used by app and widget |
 
 Open `MealsCompanion.xcodeproj` on a Mac with Xcode 15.4+ (iOS 17 SDK).
 
@@ -88,7 +88,27 @@ Empty states:
 - Not paired: “Not paired”
 - Paired, no meals yet: “No meals yet”
 
-The widget reads a local App Group snapshot. It does not talk to CloudKit itself. The host app refreshes that snapshot when it becomes active and when a **silent** CloudKit subscription fires (`content-available`). WidgetKit also rebuilds the timeline about every 15 minutes so relative times do not go stale. Apple throttles widgets; updates are not instant.
+The widget always shows the newest meal **that has a photo**. A newer meal without a photo never replaces it.
+
+How the widget stays fresh without opening the app:
+
+1. **Silent push.** The app saves a `CKDatabaseSubscription` on the shared database (the only subscription type CloudKit allows there) with `content-available`. When the publisher adds a meal, iOS wakes the app in the background, it refreshes the App Group snapshot and reloads the widget.
+2. **Background app refresh.** A `BGAppRefreshTask` (`<bundle id>.refresh`, earliest every 4 hours; iOS picks the real time) does the same refresh even if no push arrives.
+3. **Widget CloudKit fetch (opt-in).** With `MEALS_WIDGET_CLOUDKIT = YES` in `Config/Shared.xcconfig`, the widget fetches the newest photographed meal from CloudKit itself on every timeline reload (about every 30 minutes, budget permitting), falling back to the App Group snapshot. This needs the widget App ID provisioned for iCloud — see *Widget CloudKit* below. With `NO` (default) the widget reloads hourly from the App Group snapshot.
+
+Each timeline holds about 24 hours of entries so “12m ago” / “Yesterday” labels stay correct between reloads. Apple throttles background work and widget reloads; updates are not instant, and none of this runs if the app was force-quit from the app switcher.
+
+### Widget CloudKit (one-time portal step)
+
+The App Store Connect API key used by CI can enable capabilities but cannot assign a CloudKit container to an App ID, so this needs the Developer portal once:
+
+1. [Certificates, Identifiers & Profiles → Identifiers](https://developer.apple.com/account/resources/identifiers/list) → `org.pov-it.<TEAMID>.meals.widget`.
+2. Tick **iCloud**, choose **Include CloudKit support**, click **Configure** (or **Edit**), select `iCloud.org.pov-it.<TEAMID>.meals`, **Continue** → **Save** (confirm the profile-invalidation prompt).
+3. Set `MEALS_WIDGET_CLOUDKIT = YES` in `Config/Shared.xcconfig` on `main`.
+4. Run **Actions → Add Meals Identifiers** (regenerates the widget's Match profile with the iCloud entitlement).
+5. Run **Actions → Build Meals Companion**.
+
+Skipping steps 1–2 or 4 makes the build fail at code signing because the widget profile lacks the iCloud entitlement; set the flag back to `NO` to recover.
 
 ## Notifications
 
@@ -179,7 +199,7 @@ This repo is structural. It will not talk to iCloud until the Apple-side work ex
 1. **Paid Apple Developer Program** on team `Q6QCL8J6FN` (already set in `Config/Team.xcconfig`; CI also injects `TEAMID` secret over that line for the runner workspace).
 2. Developer portal identifiers already exist for this team:
    - App ID `org.pov-it.Q6QCL8J6FN.meals` with App Groups, iCloud (CloudKit), Push Notifications.
-   - App ID `org.pov-it.Q6QCL8J6FN.meals.widget` with the same App Group (widget does not need CloudKit).
+   - App ID `org.pov-it.Q6QCL8J6FN.meals.widget` with the same App Group (plus iCloud/CloudKit on the same container only if `MEALS_WIDGET_CLOUDKIT = YES`; see *Widget CloudKit*).
    - App Group `group.org.pov-it.Q6QCL8J6FN.meals`.
    - CloudKit container `iCloud.org.pov-it.Q6QCL8J6FN.meals`.
 3. Xcode: select team `Q6QCL8J6FN`, let it regenerate capabilities if it offers to. Confirm entitlements still use the xcconfig variables.
@@ -203,7 +223,7 @@ Debug Settings includes **Load sample meal**, which writes a placeholder plate i
 
 ```
 Config/                  Team, bundle, App Group, CloudKit IDs
-MealsKit/                Shared meal snapshot + theme
+MealsKit/                Shared meal snapshot, CloudKit fetch, theme
 MealsCompanion/          SwiftUI app + CloudKit accept/fetch
 MealsWidget/             WidgetKit extension
 MealsCompanion.xcodeproj

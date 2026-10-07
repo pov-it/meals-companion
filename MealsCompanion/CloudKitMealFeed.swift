@@ -6,7 +6,7 @@ import WidgetKit
 
 enum WidgetReloader {
     static func reload() {
-        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.latestMeal)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 
@@ -51,7 +51,6 @@ final class MealFeedController {
 
     var pairing: PairingState
     var meals: [Meal]
-    var latestPhoto: UIImage?
     var lastError: String?
     var isRefreshing = false
     var iCloudStatus: CKAccountStatus?
@@ -59,11 +58,11 @@ final class MealFeedController {
 
     private let client = CloudKitMealClient()
     private var lastNotifiedMealID: String?
+    private var inFlightRefresh: Task<UIBackgroundFetchResult, Never>?
 
     private init() {
         pairing = PairingStore.load()
         meals = LatestMealStore.loadMeals()
-        latestPhoto = LatestMealStore.loadLatestImage()
         userVisibleNotificationsEnabled = NotificationPreferences.userVisibleEnabled
     }
 
@@ -73,7 +72,6 @@ final class MealFeedController {
     }
 
     func bootstrap() async {
-        persistSnapshot()
         WidgetReloader.reload()
         await refreshAccountStatus()
         UIApplication.shared.registerForRemoteNotifications()
@@ -90,15 +88,28 @@ final class MealFeedController {
         }
     }
 
-    func refresh() async {
+    /// Concurrent callers (scene activation, silent push, background task) share one fetch.
+    @discardableResult
+    func refresh() async -> UIBackgroundFetchResult {
+        if let inFlightRefresh {
+            return await inFlightRefresh.value
+        }
+        let task = Task { await performRefresh() }
+        inFlightRefresh = task
+        let result = await task.value
+        inFlightRefresh = nil
+        return result
+    }
+
+    private func performRefresh() async -> UIBackgroundFetchResult {
         guard pairing.isPaired else {
             persistSnapshot()
             WidgetReloader.reload()
-            return
+            return .noData
         }
         guard !isUsingPlaceholderTeam else {
             lastError = MealFeedError.placeholderTeam.localizedDescription
-            return
+            return .failed
         }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -107,23 +118,29 @@ final class MealFeedController {
             if let iCloudStatus, iCloudStatus != .available {
                 throw MealFeedError.iCloudUnavailable(iCloudStatus)
             }
-            let fetched = try await client.fetchMeals(ownerName: pairing.ownerName)
-            let previousID = meals.first?.id
+            let previous = LatestMealStore.snapshot().meal
+            let fetched: FetchedMealFeed
+            do {
+                fetched = try await client.fetcher.fetchFeed(ownerName: pairing.ownerName, photoDownloadLimit: 30)
+            } catch {
+                MealsLog.cloudKit.error("Meal fetch failed: \(error.localizedDescription, privacy: .public)")
+                throw MealFeedError.fetchFailed(error.localizedDescription)
+            }
+            let previousNewestID = meals.first?.id
             meals = fetched.meals
             pairing.ownerName = fetched.ownerName ?? pairing.ownerName
             pairing.zoneName = fetched.zoneName ?? pairing.zoneName
-            if let photo = fetched.latestPhotoData {
-                latestPhoto = UIImage(data: photo)
-            } else {
-                latestPhoto = LatestMealStore.loadLatestImage()
-            }
             lastError = nil
-            persistSnapshot(latestPhotoData: fetched.latestPhotoData)
-            try? await client.ensureSilentSubscription(zoneName: pairing.zoneName)
+            persistSnapshot()
+            LatestMealStore.prunePhotos(keeping: Set(meals.compactMap(\.photoFileName)))
+            await client.ensureDatabaseSubscription()
             WidgetReloader.reload()
-            notifyIfNeeded(previousMealID: previousID)
+            notifyIfNeeded(previousMealID: previousNewestID)
+            let changed = fetched.latestPhotographedMeal != previous || fetched.meals.first?.id != previousNewestID
+            return changed ? .newData : .noData
         } catch {
             lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            return .failed
         }
     }
 
@@ -171,19 +188,18 @@ final class MealFeedController {
         }
     }
 
-    func handleSilentPush() async {
+    func handleSilentPush() async -> UIBackgroundFetchResult {
         await refresh()
     }
 
     func unpair() {
         pairing = .unpaired
         meals = []
-        latestPhoto = nil
         lastError = nil
         lastNotifiedMealID = nil
         LatestMealStore.clear()
         WidgetReloader.reload()
-        Task { try? await client.dropSubscriptions() }
+        Task { await client.dropSubscriptions() }
     }
 
     func setUserVisibleNotifications(_ enabled: Bool) async {
@@ -199,9 +215,6 @@ final class MealFeedController {
             userVisibleNotificationsEnabled = false
             NotificationPreferences.userVisibleEnabled = false
         }
-        if pairing.isPaired {
-            try? await client.ensureSilentSubscription(zoneName: pairing.zoneName)
-        }
     }
 
 #if DEBUG
@@ -209,14 +222,12 @@ final class MealFeedController {
         LatestMealStore.saveSampleMealForPreviews()
         pairing = PairingStore.load()
         meals = LatestMealStore.loadMeals()
-        latestPhoto = LatestMealStore.loadLatestImage()
         WidgetReloader.reload()
     }
 #endif
 
-    private func persistSnapshot(latestPhotoData: Data? = nil) {
-        let photo = latestPhotoData ?? latestPhoto.flatMap { $0.jpegData(compressionQuality: 0.82) }
-        LatestMealStore.save(meals: meals, latestPhoto: photo, pairing: pairing)
+    private func persistSnapshot() {
+        LatestMealStore.save(meals: meals, pairing: pairing)
     }
 
     private func notifyIfNeeded(previousMealID: String?) {
@@ -232,16 +243,18 @@ final class MealFeedController {
     }
 }
 
-struct FetchedMealFeed: Sendable {
-    var meals: [Meal]
-    var ownerName: String?
-    var zoneName: String?
-    var latestPhotoData: Data?
-}
-
 struct CloudKitMealClient: Sendable {
+    /// The shared database only supports CKDatabaseSubscription; zone and query
+    /// subscriptions are rejected there.
+    static let subscriptionID = "meals-shared-database"
+    private static let legacySubscriptionPrefix = "meals-silent-"
+    private static let subscriptionCheckedKey = "cloudkit.subscription.checkedAt"
+    private static let subscriptionRecheckInterval: TimeInterval = 12 * 3600
+
+    let fetcher = MealCloudKitFetcher()
+
     private var container: CKContainer {
-        CKContainer(identifier: RuntimeConfig.cloudKitContainerIdentifier)
+        fetcher.container
     }
 
     func accountStatus() async throws -> CKAccountStatus {
@@ -261,6 +274,7 @@ struct CloudKitMealClient: Sendable {
         } catch {
             throw MealFeedError.acceptFailed(error.localizedDescription)
         }
+        UserDefaults.standard.removeObject(forKey: Self.subscriptionCheckedKey)
         let share = metadata.share
         let owner: String? = {
             guard let components = metadata.ownerIdentity.nameComponents else { return nil }
@@ -279,133 +293,55 @@ struct CloudKitMealClient: Sendable {
         )
     }
 
-    func fetchMeals(ownerName: String?) async throws -> FetchedMealFeed {
+    /// Silent (content-available only) push for any change in the shared database.
+    /// User-visible alerts are posted locally after a refresh, so the push itself stays silent.
+    func ensureDatabaseSubscription() async {
+        let defaults = UserDefaults.standard
+        if let checked = defaults.object(forKey: Self.subscriptionCheckedKey) as? Date,
+           Date().timeIntervalSince(checked) < Self.subscriptionRecheckInterval {
+            return
+        }
         let database = container.sharedCloudDatabase
-        let zones: [CKRecordZone]
         do {
-            zones = try await database.allRecordZones()
-        } catch {
-            throw MealFeedError.fetchFailed(error.localizedDescription)
-        }
-
-        var records: [CKRecord] = []
-        var feedOwner = ownerName
-        var zoneName: String?
-
-        for zone in zones {
-            zoneName = zone.zoneID.zoneName
-            let mealQuery = CKQuery(
-                recordType: MealCloudKit.mealRecordType,
-                predicate: NSPredicate(value: true)
-            )
-            do {
-                let (matched, _) = try await database.records(
-                    matching: mealQuery,
-                    inZoneWith: zone.zoneID,
-                    desiredKeys: [
-                        MealCloudKit.titleKey,
-                        MealCloudKit.photographedAtKey,
-                        MealCloudKit.photoKey,
-                        MealCloudKit.ownerDisplayNameKey
-                    ],
-                    resultsLimit: 30
-                )
-                for (_, result) in matched {
-                    if case .success(let record) = result {
-                        records.append(record)
-                    }
-                }
-            } catch let error as CKError where error.code == .unknownItem {
-                continue
-            } catch {
-                throw MealFeedError.fetchFailed(error.localizedDescription)
-            }
-
-            let feedQuery = CKQuery(
-                recordType: MealCloudKit.feedRecordType,
-                predicate: NSPredicate(value: true)
-            )
-            if let (matched, _) = try? await database.records(
-                matching: feedQuery,
-                inZoneWith: zone.zoneID,
-                desiredKeys: [MealCloudKit.ownerDisplayNameKey],
-                resultsLimit: 1
-            ) {
-                for (_, result) in matched {
-                    if case .success(let record) = result,
-                       let name = record[MealCloudKit.ownerDisplayNameKey] as? String {
-                        feedOwner = name
+            let existing = try await database.allSubscriptions()
+            let legacy = existing.map(\.subscriptionID).filter { $0.hasPrefix(Self.legacySubscriptionPrefix) }
+            if !legacy.isEmpty {
+                let (_, deleted) = try await database.modifySubscriptions(saving: [], deleting: legacy)
+                for (id, result) in deleted {
+                    if case .failure(let error) = result {
+                        MealsLog.cloudKit.error("Could not delete subscription \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
                     }
                 }
             }
-        }
-
-        records.sort { lhs, rhs in
-            date(from: lhs) > date(from: rhs)
-        }
-
-        var meals: [Meal] = []
-        var latestPhoto: Data?
-        for (index, record) in records.enumerated() {
-            let title = (record[MealCloudKit.titleKey] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            var meal = Meal(
-                id: record.recordID.recordName,
-                title: (title?.isEmpty == false ? title : nil) ?? "Meal",
-                photographedAt: date(from: record),
-                ownerName: (record[MealCloudKit.ownerDisplayNameKey] as? String) ?? feedOwner
-            )
-            if let asset = record[MealCloudKit.photoKey] as? CKAsset,
-               let fileURL = asset.fileURL,
-               let data = try? Data(contentsOf: fileURL) {
-                meal.photoFileName = LatestMealStore.savePhoto(data, mealID: meal.id)
-                if index == 0 { latestPhoto = data }
-            }
-            meals.append(meal)
-        }
-
-        return FetchedMealFeed(
-            meals: meals,
-            ownerName: feedOwner,
-            zoneName: zoneName,
-            latestPhotoData: latestPhoto
-        )
-    }
-
-    func ensureSilentSubscription(zoneName: String?) async throws {
-        let database = container.sharedCloudDatabase
-        let zones = try await database.allRecordZones()
-        let target = zones.filter { zone in
-            guard let zoneName else { return true }
-            return zone.zoneID.zoneName == zoneName
-        }
-        for zone in target {
-            let subscriptionID = "meals-silent-\(zone.zoneID.zoneName)"
-            let subscription = CKRecordZoneSubscription(zoneID: zone.zoneID, subscriptionID: subscriptionID)
-            let info = CKSubscription.NotificationInfo()
-            info.shouldSendContentAvailable = true
-            if NotificationPreferences.userVisibleEnabled {
-                info.alertBody = "New meal photo"
-            } else {
+            if !existing.contains(where: { $0.subscriptionID == Self.subscriptionID }) {
+                let subscription = CKDatabaseSubscription(subscriptionID: Self.subscriptionID)
+                let info = CKSubscription.NotificationInfo()
                 info.shouldSendContentAvailable = true
-                info.alertBody = nil
-                info.soundName = nil
-                info.shouldBadge = false
+                subscription.notificationInfo = info
+                _ = try await database.save(subscription)
+                MealsLog.cloudKit.info("Saved shared-database subscription")
             }
-            subscription.notificationInfo = info
-            _ = try? await database.save(subscription)
+            defaults.set(Date(), forKey: Self.subscriptionCheckedKey)
+        } catch {
+            MealsLog.cloudKit.error("Shared-database subscription failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    func dropSubscriptions() async throws {
+    func dropSubscriptions() async {
+        UserDefaults.standard.removeObject(forKey: Self.subscriptionCheckedKey)
         let database = container.sharedCloudDatabase
-        let subscriptions = (try? await database.allSubscriptions()) ?? []
-        for subscription in subscriptions {
-            _ = try? await database.deleteSubscription(withID: subscription.subscriptionID)
+        do {
+            let ids = try await database.allSubscriptions().map(\.subscriptionID)
+            guard !ids.isEmpty else { return }
+            let (_, deleted) = try await database.modifySubscriptions(saving: [], deleting: ids)
+            for (id, result) in deleted {
+                if case .failure(let error) = result {
+                    MealsLog.cloudKit.error("Could not delete subscription \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        } catch {
+            MealsLog.cloudKit.error("Could not list subscriptions: \(error.localizedDescription, privacy: .public)")
         }
-    }
-
-    private func date(from record: CKRecord) -> Date {
-        record[MealCloudKit.photographedAtKey] as? Date ?? record.creationDate ?? Date()
     }
 
     private func isLikelyShareURL(_ url: URL) -> Bool {

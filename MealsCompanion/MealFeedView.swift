@@ -27,7 +27,7 @@ struct MealFeedView: View {
                     Button {
                         selectedMeal = hero
                     } label: {
-                        MealHeroCard(meal: hero, image: feed.latestPhoto ?? LatestMealStore.photo(for: hero))
+                        MealHeroCard(meal: hero, image: LatestMealStore.photo(for: hero))
                     }
                     .buttonStyle(.plain)
                 }
