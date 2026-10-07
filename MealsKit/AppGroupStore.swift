@@ -10,6 +10,13 @@ public enum RuntimeConfig {
         plistValue("MealsCloudKitContainerIdentifier") ?? "iCloud.org.pov-it.Q6QCL8J6FN.meals"
     }
 
+    /// Only true in the widget when it was signed with the iCloud entitlement
+    /// (`MEALS_WIDGET_CLOUDKIT = YES`). Touching CKContainer without it crashes the extension.
+    public static var widgetCloudKitEnabled: Bool {
+        guard let value = plistValue("MealsWidgetCloudKitEnabled")?.uppercased() else { return false }
+        return value == "YES" || value == "1" || value == "TRUE"
+    }
+
     private static func plistValue(_ key: String) -> String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -109,39 +116,87 @@ public enum LatestMealStore {
         return nil
     }
 
-    public static func save(meals: [Meal], latestPhoto: Data?, pairing: PairingState) {
+    /// The widget snapshot always describes the newest meal that has a photo,
+    /// never a newer photo-less meal paired with an older picture.
+    public static func newestPhotographedMeal(in meals: [Meal]) -> (meal: Meal, photo: Data)? {
+        for meal in meals where meal.photoFileName != nil {
+            if let data = photoData(for: meal) {
+                return (meal, data)
+            }
+        }
+        return nil
+    }
+
+    public static func save(meals: [Meal], pairing: PairingState) {
         PairingStore.save(pairing)
-        if let container = AppGroupStore.containerURL {
-            let snapshot = LatestMealSnapshot(
-                isPaired: pairing.isPaired,
-                ownerName: pairing.ownerName,
-                meal: meals.first,
-                updatedAt: Date()
-            )
-            if let data = try? MealJSON.encoder.encode(snapshot) {
-                try? data.write(to: container.appendingPathComponent(snapshotFile), options: .atomic)
-            }
-            if let data = try? MealJSON.encoder.encode(meals) {
-                try? data.write(to: container.appendingPathComponent(mealsFile), options: .atomic)
-            }
-            let photoURL = container.appendingPathComponent(latestPhotoFile)
-            if let latestPhoto, let resized = Self.widgetJPEG(from: latestPhoto) {
-                try? resized.write(to: photoURL, options: .atomic)
-            } else if latestPhoto == nil {
-                try? FileManager.default.removeItem(at: photoURL)
-            }
+        saveMeals(meals)
+        let latest = newestPhotographedMeal(in: meals)
+        saveSnapshot(latestPhotographedMeal: latest?.meal, latestPhoto: latest?.photo, pairing: pairing)
+    }
+
+    public static func saveMeals(_ meals: [Meal]) {
+        guard let container = AppGroupStore.containerURL,
+              let data = try? MealJSON.encoder.encode(meals) else { return }
+        try? data.write(to: container.appendingPathComponent(mealsFile), options: .atomic)
+    }
+
+    public static func saveSnapshot(latestPhotographedMeal: Meal?, latestPhoto: Data?, pairing: PairingState) {
+        guard let container = AppGroupStore.containerURL else { return }
+        let photoURL = container.appendingPathComponent(latestPhotoFile)
+        var meal = latestPhotographedMeal
+        if meal != nil, let latestPhoto, let resized = widgetJPEG(from: latestPhoto) {
+            try? resized.write(to: photoURL, options: .atomic)
+        } else {
+            meal = nil
+            try? FileManager.default.removeItem(at: photoURL)
+        }
+        let snapshot = LatestMealSnapshot(
+            isPaired: pairing.isPaired,
+            ownerName: pairing.ownerName,
+            meal: meal,
+            updatedAt: Date()
+        )
+        if let data = try? MealJSON.encoder.encode(snapshot) {
+            try? data.write(to: container.appendingPathComponent(snapshotFile), options: .atomic)
         }
     }
 
-    public static func savePhoto(_ data: Data, mealID: String) -> String? {
+    /// File name for a meal photo. `version` is the CloudKit record change tag, so an
+    /// edited record gets a fresh download while an unchanged one is served from disk.
+    public static func photoFileName(mealID: String, version: String?) -> String {
+        let raw = version.map { "\(mealID)-\($0)" } ?? mealID
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+        let safe = String(raw.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" })
+        return "\(safe).jpg"
+    }
+
+    public static func hasPhoto(named name: String) -> Bool {
+        guard let directory = AppGroupStore.photosDirectory else { return false }
+        return FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path)
+    }
+
+    public static func photoData(for meal: Meal) -> Data? {
+        guard let name = meal.photoFileName, let directory = AppGroupStore.photosDirectory else { return nil }
+        return try? Data(contentsOf: directory.appendingPathComponent(name))
+    }
+
+    public static func savePhoto(_ data: Data, mealID: String, version: String? = nil) -> String? {
         guard let directory = AppGroupStore.photosDirectory else { return nil }
-        let name = "\(mealID).jpg"
+        let name = photoFileName(mealID: mealID, version: version)
         let url = directory.appendingPathComponent(name)
-        if let jpeg = widgetJPEG(from: data, maxDimension: 1600) {
-            try? jpeg.write(to: url, options: .atomic)
+        if let jpeg = widgetJPEG(from: data, maxDimension: 1600),
+           (try? jpeg.write(to: url, options: .atomic)) != nil {
             return name
         }
         return nil
+    }
+
+    public static func prunePhotos(keeping names: Set<String>) {
+        guard let directory = AppGroupStore.photosDirectory,
+              let files = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return }
+        for file in files where !names.contains(file) {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(file))
+        }
     }
 
     public static func clear() {
@@ -191,7 +246,7 @@ public enum LatestMealStore {
             zoneName: MealCloudKit.zoneName,
             rootRecordName: "sample"
         )
-        save(meals: [meal], latestPhoto: data, pairing: pairing)
+        save(meals: [meal], pairing: pairing)
     }
 
     private static func samplePlateImage() -> UIImage {
