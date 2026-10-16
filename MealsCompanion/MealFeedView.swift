@@ -12,7 +12,7 @@ struct MealFeedView: View {
                 mealList
             }
         }
-            .refreshable {
+        .refreshable {
             await feed.refresh()
         }
         .sheet(item: $selectedMeal) { meal in

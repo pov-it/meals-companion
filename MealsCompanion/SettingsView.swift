@@ -47,7 +47,6 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(Palette.terracotta)
                     }
-                }
                     if feed.isUsingPlaceholderTeam {
                         Text("DEVELOPMENT_TEAM is still TEAMID. Replace it in Config/Team.xcconfig, enable the App Group and CloudKit container for that team, then rebuild.")
                             .font(.footnote)
