@@ -31,21 +31,40 @@ public struct MealCloudKitFetcher: Sendable {
 
     /// - Parameters:
     ///   - photoDownloadLimit: how many of the newest meals should have their photo cached.
-    ///   - maxPhotoScan: how far back to keep looking for the newest meal that has a photo.
+    ///   - maxPhotoScan: how far back to keep looking for a meal that has a photo.
     public func fetchFeed(
         ownerName: String?,
         photoDownloadLimit: Int,
         maxPhotoScan: Int = 60
     ) async throws -> FetchedMealFeed {
         let database = container.sharedCloudDatabase
-        let zones = try await database.allRecordZones()
+        let zones: [CKRecordZone]
+        do {
+            zones = try await database.allRecordZones()
+        } catch {
+            MealsLog.cloudKit.error("Could not list shared zones: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+
+        let orderedZones = zones.sorted { lhs, rhs in
+            if lhs.zoneID.zoneName == MealCloudKit.zoneName { return true }
+            if rhs.zoneID.zoneName == MealCloudKit.zoneName { return false }
+            return lhs.zoneID.zoneName < rhs.zoneID.zoneName
+        }
 
         var entries: [Entry] = []
         var feedOwner = ownerName
-        for zone in zones {
+        var lastZoneError: Error?
+        for zone in orderedZones {
             do {
                 entries += try await mealEntries(in: zone.zoneID, database: database)
             } catch let error as CKError where error.code == .unknownItem || error.code == .zoneNotFound {
+                continue
+            } catch {
+                lastZoneError = error
+                MealsLog.cloudKit.error(
+                    "Meal query failed in \(zone.zoneID.zoneName, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
                 continue
             }
             if let name = await feedOwnerName(in: zone.zoneID, database: database) {
@@ -53,26 +72,42 @@ public struct MealCloudKitFetcher: Sendable {
             }
         }
 
-        entries.sort { $0.meal.photographedAt > $1.meal.photographedAt }
-        for index in entries.indices where entries[index].meal.ownerName == nil {
-            entries[index].meal.ownerName = feedOwner
+        if entries.isEmpty, let lastZoneError {
+            throw lastZoneError
         }
 
-        try await attachPhotos(
-            to: &entries,
+        var mealsByID: [String: Entry] = [:]
+        for entry in entries {
+            let id = entry.meal.id
+            if let existing = mealsByID[id] {
+                if entry.meal.photographedAt > existing.meal.photographedAt {
+                    mealsByID[id] = entry
+                }
+            } else {
+                mealsByID[id] = entry
+            }
+        }
+        var uniqueEntries = Array(mealsByID.values)
+        uniqueEntries.sort { $0.meal.photographedAt > $1.meal.photographedAt }
+        for index in uniqueEntries.indices where uniqueEntries[index].meal.ownerName == nil {
+            uniqueEntries[index].meal.ownerName = feedOwner
+        }
+
+        await attachPhotos(
+            to: &uniqueEntries,
             database: database,
             photoDownloadLimit: photoDownloadLimit,
             maxPhotoScan: maxPhotoScan
         )
 
-        let meals = entries.map(\.meal)
-        let latest = LatestMealStore.newestPhotographedMeal(in: meals)
+        let meals = MealFeedOrdering.deduplicatedNewestFirst(uniqueEntries.map(\.meal))
+        let latestPhotographed = LatestMealStore.newestPhotographedMeal(in: meals)
         return FetchedMealFeed(
             meals: meals,
             ownerName: feedOwner,
-            zoneName: entries.first?.zoneID.zoneName ?? zones.first?.zoneID.zoneName,
-            latestPhotographedMeal: latest?.meal,
-            latestPhotoData: latest?.photo
+            zoneName: uniqueEntries.first?.zoneID.zoneName ?? orderedZones.first?.zoneID.zoneName,
+            latestPhotographedMeal: latestPhotographed?.meal,
+            latestPhotoData: latestPhotographed?.photo
         )
     }
 
@@ -98,29 +133,34 @@ public struct MealCloudKitFetcher: Sendable {
         var pages = 1
         while true {
             for (_, result) in page.matchResults {
-                if case .success(let record) = result {
-                    entries.append(entry(from: record, zoneID: zoneID))
+                if case .success(let record) = result, let mapped = entry(from: record, zoneID: zoneID) {
+                    entries.append(mapped)
                 }
             }
             guard let cursor = page.queryCursor, pages < 50 else { break }
-            page = try await database.records(
-                continuingMatchFrom: cursor,
-                desiredKeys: keys,
-                resultsLimit: CKQueryOperation.maximumResults
-            )
+            do {
+                page = try await database.records(
+                    continuingMatchFrom: cursor,
+                    desiredKeys: keys,
+                    resultsLimit: CKQueryOperation.maximumResults
+                )
+            } catch {
+                MealsLog.cloudKit.error("Meal page \(pages, privacy: .public) stopped: \(error.localizedDescription, privacy: .public)")
+                break
+            }
             pages += 1
         }
         return entries
     }
 
-    private func entry(from record: CKRecord, zoneID: CKRecordZone.ID) -> Entry {
-        let title = (record[MealCloudKit.titleKey] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let meal = Meal(
+    private func entry(from record: CKRecord, zoneID: CKRecordZone.ID) -> Entry? {
+        guard let meal = MealRecordDecoder.meal(
             id: record.recordID.recordName,
-            title: (title?.isEmpty == false ? title : nil) ?? "Meal",
-            photographedAt: record[MealCloudKit.photographedAtKey] as? Date ?? record.creationDate ?? Date(),
-            ownerName: record[MealCloudKit.ownerDisplayNameKey] as? String
-        )
+            title: record[MealCloudKit.titleKey],
+            photographedAt: record[MealCloudKit.photographedAtKey],
+            creationDate: record.creationDate,
+            ownerName: record[MealCloudKit.ownerDisplayNameKey]
+        ) else { return nil }
         return Entry(recordID: record.recordID, zoneID: zoneID, changeTag: record.recordChangeTag, meal: meal)
     }
 
@@ -141,71 +181,51 @@ public struct MealCloudKitFetcher: Sendable {
         return nil
     }
 
-    /// Walks meals newest first, reusing cached photos and downloading the rest in small
-    /// batches, until `photoDownloadLimit` meals are covered and a photographed meal is found.
+    /// Walks meals newest first, reusing cached photos and downloading the rest one at a
+    /// time. Photo failures never fail the feed — a missing `CKAsset` is a meal without a plate.
     private func attachPhotos(
         to entries: inout [Entry],
         database: CKDatabase,
         photoDownloadLimit: Int,
         maxPhotoScan: Int
-    ) async throws {
-        let batchSize = 6
+    ) async {
         var foundPhoto = false
         var start = 0
         while start < entries.count {
             let wantsMore = start < photoDownloadLimit || (!foundPhoto && start < maxPhotoScan)
             guard wantsMore else { break }
-            let batch = start..<min(entries.count, start + batchSize)
-
-            var missing: [CKRecord.ID] = []
-            for index in batch {
-                let name = LatestMealStore.photoFileName(mealID: entries[index].meal.id, version: entries[index].changeTag)
-                if LatestMealStore.hasPhoto(named: name) {
-                    entries[index].meal.photoFileName = name
-                } else {
-                    missing.append(entries[index].recordID)
-                }
-            }
-
-            if !missing.isEmpty {
-                let results = try await database.records(for: missing, desiredKeys: [MealCloudKit.photoKey])
-                for index in batch where entries[index].meal.photoFileName == nil {
-                    guard case .success(let record)? = results[entries[index].recordID],
-                          let asset = record[MealCloudKit.photoKey] as? CKAsset,
-                          let url = asset.fileURL,
-                          let data = try? Data(contentsOf: url) else { continue }
-                    entries[index].meal.photoFileName = LatestMealStore.savePhoto(
-                        data,
-                        mealID: entries[index].meal.id,
-                        version: record.recordChangeTag ?? entries[index].changeTag
-                    )
-                }
-            }
-
-            if batch.contains(where: { entries[$0].meal.photoFileName != nil }) {
+            let index = start
+            let name = LatestMealStore.photoFileName(mealID: entries[index].meal.id, version: entries[index].changeTag)
+            if LatestMealStore.hasPhoto(named: name) {
+                entries[index].meal.photoFileName = name
                 foundPhoto = true
+                start += 1
+                continue
             }
-            start = batch.upperBound
-        }
-    }
-}
 
-public enum AsyncTimeout {
-    public struct Expired: Error {}
-
-    public static func run<T: Sendable>(
-        seconds: Double,
-        _ operation: @escaping @Sendable () async throws -> T
-    ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await operation() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw Expired()
+            do {
+                let results = try await database.records(
+                    for: [entries[index].recordID],
+                    desiredKeys: [MealCloudKit.photoKey]
+                )
+                if case .success(let record)? = results[entries[index].recordID],
+                   let asset = record[MealCloudKit.photoKey] as? CKAsset,
+                   let url = asset.fileURL,
+                   let data = try? Data(contentsOf: url),
+                   let saved = LatestMealStore.savePhoto(
+                    data,
+                    mealID: entries[index].meal.id,
+                    version: record.recordChangeTag ?? entries[index].changeTag
+                   ) {
+                    entries[index].meal.photoFileName = saved
+                    foundPhoto = true
+                }
+            } catch {
+                MealsLog.cloudKit.error(
+                    "Photo download skipped: \(error.localizedDescription, privacy: .public)"
+                )
             }
-            defer { group.cancelAll() }
-            guard let result = try await group.next() else { throw Expired() }
-            return result
+            start += 1
         }
     }
 }

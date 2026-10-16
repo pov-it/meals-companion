@@ -90,7 +90,7 @@ public enum LatestMealStore {
             if let meal = snapshot().meal { return [meal] }
             return []
         }
-        return meals
+        return MealFeedOrdering.deduplicatedNewestFirst(meals.filter { !$0.id.isEmpty })
     }
 
     public static func latestPhotoURL() -> URL? {
@@ -116,10 +116,10 @@ public enum LatestMealStore {
         return nil
     }
 
-    /// The widget snapshot always describes the newest meal that has a photo,
-    /// never a newer photo-less meal paired with an older picture.
+    /// Newest meal that has a photo on disk. Used for optional gallery thumbnails,
+    /// not for choosing which meal the widget displays.
     public static func newestPhotographedMeal(in meals: [Meal]) -> (meal: Meal, photo: Data)? {
-        for meal in meals where meal.photoFileName != nil {
+        for meal in MealFeedOrdering.deduplicatedNewestFirst(meals) where meal.photoFileName != nil {
             if let data = photoData(for: meal) {
                 return (meal, data)
             }
@@ -129,9 +129,14 @@ public enum LatestMealStore {
 
     public static func save(meals: [Meal], pairing: PairingState) {
         PairingStore.save(pairing)
-        saveMeals(meals)
-        let latest = newestPhotographedMeal(in: meals)
-        saveSnapshot(latestPhotographedMeal: latest?.meal, latestPhoto: latest?.photo, pairing: pairing)
+        let ordered = MealFeedOrdering.deduplicatedNewestFirst(meals)
+        saveMeals(ordered)
+        let latest = MealFeedOrdering.displayLatest(in: ordered)
+        saveSnapshot(
+            latestMeal: latest,
+            latestPhoto: latest.flatMap(photoData(for:)),
+            pairing: pairing
+        )
     }
 
     public static func saveMeals(_ meals: [Meal]) {
@@ -140,20 +145,18 @@ public enum LatestMealStore {
         try? data.write(to: container.appendingPathComponent(mealsFile), options: .atomic)
     }
 
-    public static func saveSnapshot(latestPhotographedMeal: Meal?, latestPhoto: Data?, pairing: PairingState) {
+    public static func saveSnapshot(latestMeal: Meal?, latestPhoto: Data?, pairing: PairingState) {
         guard let container = AppGroupStore.containerURL else { return }
         let photoURL = container.appendingPathComponent(latestPhotoFile)
-        var meal = latestPhotographedMeal
-        if meal != nil, let latestPhoto, let resized = widgetJPEG(from: latestPhoto) {
+        if latestMeal != nil, let latestPhoto, let resized = widgetJPEG(from: latestPhoto) {
             try? resized.write(to: photoURL, options: .atomic)
         } else {
-            meal = nil
             try? FileManager.default.removeItem(at: photoURL)
         }
         let snapshot = LatestMealSnapshot(
             isPaired: pairing.isPaired,
             ownerName: pairing.ownerName,
-            meal: meal,
+            meal: latestMeal,
             updatedAt: Date()
         )
         if let data = try? MealJSON.encoder.encode(snapshot) {
@@ -164,10 +167,7 @@ public enum LatestMealStore {
     /// File name for a meal photo. `version` is the CloudKit record change tag, so an
     /// edited record gets a fresh download while an unchanged one is served from disk.
     public static func photoFileName(mealID: String, version: String?) -> String {
-        let raw = version.map { "\(mealID)-\($0)" } ?? mealID
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
-        let safe = String(raw.unicodeScalars.map { allowed.contains($0) ? Character($0) : "_" })
-        return "\(safe).jpg"
+        MealPhotoCache.fileName(mealID: mealID, version: version)
     }
 
     public static func hasPhoto(named name: String) -> Bool {
@@ -212,16 +212,7 @@ public enum LatestMealStore {
     }
 
     public static func widgetJPEG(from data: Data, maxDimension: CGFloat = 800) -> Data? {
-        guard let image = UIImage(data: data) else { return data }
-        let size = image.size
-        let longest = max(size.width, size.height)
-        let scale = longest > maxDimension ? maxDimension / longest : 1
-        let target = CGSize(width: max(1, size.width * scale), height: max(1, size.height * scale))
-        let renderer = UIGraphicsImageRenderer(size: target)
-        let rendered = renderer.image { _ in
-            image.draw(in: CGRect(origin: .zero, size: target))
-        }
-        return rendered.jpegData(compressionQuality: 0.82)
+        MealImageTranscoder.jpeg(from: data, maxDimension: maxDimension)
     }
 
 #if DEBUG

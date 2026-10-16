@@ -121,10 +121,16 @@ final class MealFeedController {
             let previous = LatestMealStore.snapshot().meal
             let fetched: FetchedMealFeed
             do {
-                fetched = try await client.fetcher.fetchFeed(ownerName: pairing.ownerName, photoDownloadLimit: 30)
+                fetched = try await FetchTimeout.run(seconds: 25) {
+                    try await client.fetcher.fetchFeed(
+                        ownerName: pairing.ownerName,
+                        photoDownloadLimit: 12,
+                        maxPhotoScan: 40
+                    )
+                }
             } catch {
                 MealsLog.cloudKit.error("Meal fetch failed: \(error.localizedDescription, privacy: .public)")
-                throw MealFeedError.fetchFailed(error.localizedDescription)
+                throw MealFeedError.fetchFailed(CloudKitUserFacingError.message(for: error))
             }
             let previousNewestID = meals.first?.id
             meals = fetched.meals
@@ -136,10 +142,12 @@ final class MealFeedController {
             await client.ensureDatabaseSubscription()
             WidgetReloader.reload()
             notifyIfNeeded(previousMealID: previousNewestID)
-            let changed = fetched.latestPhotographedMeal != previous || fetched.meals.first?.id != previousNewestID
+            let newest = MealFeedOrdering.displayLatest(in: fetched.meals)
+            let changed = newest != previous || newest?.id != previousNewestID
             return changed ? .newData : .noData
         } catch {
-            lastError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            lastError = (error as? LocalizedError)?.errorDescription
+                ?? CloudKitUserFacingError.message(for: error)
             return .failed
         }
     }

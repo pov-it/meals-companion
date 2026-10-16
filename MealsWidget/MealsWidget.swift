@@ -26,7 +26,9 @@ struct MealsTimelineProvider: TimelineProvider {
             let entries = MealsTimelineSchedule.entryDates(for: snapshot.meal, from: now).map {
                 MealsWidgetEntry(date: $0, snapshot: snapshot, image: image)
             }
-            let reload = now.addingTimeInterval(MealsTimelineSchedule.reloadInterval)
+            let reload = now.addingTimeInterval(
+                MealsTimelineSchedule.reloadInterval(widgetCloudKitEnabled: RuntimeConfig.widgetCloudKitEnabled)
+            )
             completion(Timeline(entries: entries, policy: .after(reload)))
         }
     }
@@ -48,41 +50,21 @@ enum WidgetCloudKitRefresh {
         guard RuntimeConfig.widgetCloudKitEnabled, PairingStore.load().isPaired else { return }
         let ownerName = PairingStore.load().ownerName
         do {
-            let feed = try await AsyncTimeout.run(seconds: 20) {
-                try await MealCloudKitFetcher().fetchFeed(ownerName: ownerName, photoDownloadLimit: 0)
+            let feed = try await FetchTimeout.run(seconds: 15) {
+                try await MealCloudKitFetcher().fetchFeed(
+                    ownerName: ownerName,
+                    photoDownloadLimit: 1,
+                    maxPhotoScan: 8
+                )
             }
-            let pairing = PairingStore.load()
-            guard pairing.isPaired, let meal = feed.latestPhotographedMeal, let photo = feed.latestPhotoData else { return }
-            LatestMealStore.saveSnapshot(latestPhotographedMeal: meal, latestPhoto: photo, pairing: pairing)
+            var pairing = PairingStore.load()
+            guard pairing.isPaired else { return }
+            pairing.ownerName = feed.ownerName ?? pairing.ownerName
+            pairing.zoneName = feed.zoneName ?? pairing.zoneName
+            LatestMealStore.save(meals: feed.meals, pairing: pairing)
         } catch {
             MealsLog.cloudKit.error("Widget CloudKit refresh failed: \(error.localizedDescription, privacy: .public)")
         }
-    }
-}
-
-enum MealsTimelineSchedule {
-    static var reloadInterval: TimeInterval {
-        RuntimeConfig.widgetCloudKitEnabled ? 30 * 60 : 60 * 60
-    }
-
-    static let horizon: TimeInterval = 24 * 3600
-
-    /// Entries only where `RelativeTimestamp.widgetLabel` would change, covering ~24h.
-    static func entryDates(for meal: Meal?, from now: Date) -> [Date] {
-        guard let meal else { return [now] }
-        let end = now.addingTimeInterval(horizon)
-        let taken = meal.photographedAt
-        var dates: [Date] = [now, taken.addingTimeInterval(60), taken.addingTimeInterval(3600), taken.addingTimeInterval(48 * 3600)]
-        for minutes in stride(from: 5, to: 60, by: 5) {
-            dates.append(taken.addingTimeInterval(TimeInterval(minutes * 60)))
-        }
-        var midnight = Calendar.current.startOfDay(for: now)
-        for _ in 0..<2 {
-            guard let next = Calendar.current.date(byAdding: .day, value: 1, to: midnight) else { break }
-            dates.append(next)
-            midnight = next
-        }
-        return Array(Set(dates.filter { $0 >= now && $0 <= end })).sorted()
     }
 }
 
@@ -92,7 +74,7 @@ struct MealsWidget: Widget {
             MealsWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Latest meal")
-        .description("The most recent photographed meal, with its name and time. No glucose data.")
+        .description("The same latest meal as the app, with its name and time. No glucose data.")
         .supportedFamilies([
             .systemSmall,
             .systemMedium,

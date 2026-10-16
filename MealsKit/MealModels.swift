@@ -43,6 +43,16 @@ public struct Meal: Identifiable, Hashable, Sendable, Codable {
         self.ownerName = ownerName
         self.photoFileName = photoFileName
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = ((try? container.decode(String.self, forKey: .id)) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        title = MealRecordDecoder.title(from: try? container.decode(String.self, forKey: .title))
+        photographedAt = MealRecordDecoder.decodeJSONDate(container, forKey: .photographedAt) ?? Date.distantPast
+        ownerName = MealRecordDecoder.ownerName(from: try? container.decode(String.self, forKey: .ownerName))
+        photoFileName = try? container.decode(String.self, forKey: .photoFileName)
+    }
 }
 
 public struct PairingState: Codable, Equatable, Sendable {
@@ -77,6 +87,16 @@ public struct PairingState: Codable, Equatable, Sendable {
         self.zoneName = zoneName
         self.rootRecordName = rootRecordName
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isPaired = (try? container.decode(Bool.self, forKey: .isPaired)) ?? false
+        ownerName = try container.decodeIfPresent(String.self, forKey: .ownerName)
+        shareURLString = try container.decodeIfPresent(String.self, forKey: .shareURLString)
+        acceptedAt = MealRecordDecoder.decodeJSONDate(container, forKey: .acceptedAt)
+        zoneName = try container.decodeIfPresent(String.self, forKey: .zoneName)
+        rootRecordName = try container.decodeIfPresent(String.self, forKey: .rootRecordName)
+    }
 }
 
 public struct LatestMealSnapshot: Codable, Equatable, Sendable {
@@ -97,6 +117,14 @@ public struct LatestMealSnapshot: Codable, Equatable, Sendable {
         self.ownerName = ownerName
         self.meal = meal
         self.updatedAt = updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isPaired = (try? container.decode(Bool.self, forKey: .isPaired)) ?? false
+        ownerName = try container.decodeIfPresent(String.self, forKey: .ownerName)
+        meal = try container.decodeIfPresent(Meal.self, forKey: .meal)
+        updatedAt = MealRecordDecoder.decodeJSONDate(container, forKey: .updatedAt) ?? .distantPast
     }
 }
 

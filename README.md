@@ -88,7 +88,7 @@ Empty states:
 - Not paired: “Not paired”
 - Paired, no meals yet: “No meals yet”
 
-The widget always shows the newest meal **that has a photo**. A newer meal without a photo never replaces it.
+The widget shows the **same latest meal as the app** (newest `photographedAt`). If that meal has no photo, the widget uses a placeholder rather than an older meal’s picture.
 
 How the widget stays fresh without opening the app:
 

@@ -29,6 +29,8 @@
 		AC0DC4E8CDD993B3F6789C1A /* MealsWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1B57B0C87A58442C489D3141 /* MealsWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F8B75FE2135CCA6F4CDD14BA /* MealCloudKitFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75AC818D516A2A89BFA4A9B8 /* MealCloudKitFetcher.swift */; };
 		534B9012C2541FF9ED82F673 /* MealCloudKitFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75AC818D516A2A89BFA4A9B8 /* MealCloudKitFetcher.swift */; };
+		A91C0E1B2F4A61C08D7E3B10 /* MealFeedLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2E6A4C1B9F70E35C48D201 /* MealFeedLogic.swift */; };
+		B02D1F2C3E5B72D19E8F4C21 /* MealFeedLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2E6A4C1B9F70E35C48D201 /* MealFeedLogic.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -84,6 +86,7 @@
 		BE8A3382CE9302457DB090B9 /* MealsWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MealsWidget.entitlements; sourceTree = "<group>"; };
 		EF548DEE8C8AC4C2DBD7243E /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		75AC818D516A2A89BFA4A9B8 /* MealCloudKitFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealCloudKitFetcher.swift; sourceTree = "<group>"; };
+		8D2E6A4C1B9F70E35C48D201 /* MealFeedLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealFeedLogic.swift; sourceTree = "<group>"; };
 		BA7DCEE66B40092AB8490F79 /* MealsWidgetCloudKit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MealsWidgetCloudKit.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -144,6 +147,7 @@
 				C41C41AB8C9931888715F43C /* MealModels.swift */,
 				306671B3DDB4243E00B312C0 /* AppGroupStore.swift */,
 				75AC818D516A2A89BFA4A9B8 /* MealCloudKitFetcher.swift */,
+				8D2E6A4C1B9F70E35C48D201 /* MealFeedLogic.swift */,
 				6394DD763ACB67478C901556 /* Theme.swift */,
 				8BE1AD557FF3E6330C225AB2 /* Assets.xcassets */,
 			);
@@ -287,6 +291,7 @@
 				467FEC1E4D8F8701141711CF /* MealModels.swift in Sources */,
 				1479FDFF7A6907B5F9BFA832 /* AppGroupStore.swift in Sources */,
 				F8B75FE2135CCA6F4CDD14BA /* MealCloudKitFetcher.swift in Sources */,
+				A91C0E1B2F4A61C08D7E3B10 /* MealFeedLogic.swift in Sources */,
 				BA399CFB5E23991CBEF666EC /* Theme.swift in Sources */,
 				D1D7E48ECF0783FE2DB79B19 /* MealsCompanionApp.swift in Sources */,
 				0FC66E060F6B1FF5273D346C /* CloudKitMealFeed.swift in Sources */,
@@ -304,6 +309,7 @@
 				82799BF11C97BB134A17C7C2 /* MealModels.swift in Sources */,
 				36EAE973BBC2C30EF595E919 /* AppGroupStore.swift in Sources */,
 				534B9012C2541FF9ED82F673 /* MealCloudKitFetcher.swift in Sources */,
+				B02D1F2C3E5B72D19E8F4C21 /* MealFeedLogic.swift in Sources */,
 				72670254952ADCE311B520E5 /* Theme.swift in Sources */,
 				70A30EA72F6FA929808C87D7 /* MealsWidget.swift in Sources */,
 			);
