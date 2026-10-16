@@ -121,9 +121,11 @@ final class MealFeedController {
             let previous = LatestMealStore.snapshot().meal
             let fetched: FetchedMealFeed
             do {
+                let fetcher = client.fetcher
+                let ownerName = pairing.ownerName
                 fetched = try await FetchTimeout.run(seconds: 25) {
-                    try await client.fetcher.fetchFeed(
-                        ownerName: pairing.ownerName,
+                    try await fetcher.fetchFeed(
+                        ownerName: ownerName,
                         photoDownloadLimit: 12,
                         maxPhotoScan: 40
                     )
