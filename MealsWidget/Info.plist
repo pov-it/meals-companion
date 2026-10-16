@@ -6,6 +6,10 @@
 	<string>Meals</string>
 	<key>MealsAppGroupIdentifier</key>
 	<string>$(MEALS_APP_GROUP)</string>
+	<key>MealsCloudKitContainerIdentifier</key>
+	<string>$(CLOUDKIT_CONTAINER_IDENTIFIER)</string>
+	<key>MealsWidgetCloudKitEnabled</key>
+	<string>$(MEALS_WIDGET_CLOUDKIT)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

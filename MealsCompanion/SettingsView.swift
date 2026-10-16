@@ -42,6 +42,11 @@ struct SettingsView: View {
                     LabeledContent("iCloud", value: iCloudLabel)
                     LabeledContent("Container", value: RuntimeConfig.cloudKitContainerIdentifier)
                     LabeledContent("App Group", value: RuntimeConfig.appGroupIdentifier)
+                    if let lastError = feed.lastError {
+                        Text(lastError)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.terracotta)
+                    }
                     if feed.isUsingPlaceholderTeam {
                         Text("DEVELOPMENT_TEAM is still TEAMID. Replace it in Config/Team.xcconfig, enable the App Group and CloudKit container for that team, then rebuild.")
                             .font(.footnote)

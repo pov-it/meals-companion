@@ -18,9 +18,19 @@ struct MealsTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<MealsWidgetEntry>) -> Void) {
-        let entry = currentEntry()
-        let refresh = Calendar.current.date(byAdding: .minute, value: 15, to: Date()) ?? Date().addingTimeInterval(15 * 60)
-        completion(Timeline(entries: [entry], policy: .after(refresh)))
+        Task {
+            await WidgetCloudKitRefresh.run()
+            let now = Date()
+            let snapshot = LatestMealStore.snapshot()
+            let image = LatestMealStore.loadLatestImage()
+            let entries = MealsTimelineSchedule.entryDates(for: snapshot.meal, from: now).map {
+                MealsWidgetEntry(date: $0, snapshot: snapshot, image: image)
+            }
+            let reload = now.addingTimeInterval(
+                MealsTimelineSchedule.reloadInterval(widgetCloudKitEnabled: RuntimeConfig.widgetCloudKitEnabled)
+            )
+            completion(Timeline(entries: entries, policy: .after(reload)))
+        }
     }
 
     private func currentEntry() -> MealsWidgetEntry {
@@ -33,13 +43,38 @@ struct MealsTimelineProvider: TimelineProvider {
     }
 }
 
+/// Lets the widget pick up a new photographed meal without the app running.
+/// Falls back silently to the App Group snapshot the app last wrote.
+enum WidgetCloudKitRefresh {
+    static func run() async {
+        guard RuntimeConfig.widgetCloudKitEnabled, PairingStore.load().isPaired else { return }
+        let ownerName = PairingStore.load().ownerName
+        do {
+            let feed = try await FetchTimeout.run(seconds: 15) {
+                try await MealCloudKitFetcher().fetchFeed(
+                    ownerName: ownerName,
+                    photoDownloadLimit: 1,
+                    maxPhotoScan: 8
+                )
+            }
+            var pairing = PairingStore.load()
+            guard pairing.isPaired else { return }
+            pairing.ownerName = feed.ownerName ?? pairing.ownerName
+            pairing.zoneName = feed.zoneName ?? pairing.zoneName
+            LatestMealStore.save(meals: feed.meals, pairing: pairing)
+        } catch {
+            MealsLog.cloudKit.error("Widget CloudKit refresh failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+}
+
 struct MealsWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: WidgetKind.latestMeal, provider: MealsTimelineProvider()) { entry in
             MealsWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Latest meal")
-        .description("The most recent photographed meal, with its name and time. No glucose data.")
+        .description("The same latest meal as the app, with its name and time. No glucose data.")
         .supportedFamilies([
             .systemSmall,
             .systemMedium,

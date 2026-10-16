@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).refresh</string>
+	</array>
 	<key>CKSharingSupported</key>
 	<true/>
 	<key>MealsAppGroupIdentifier</key>
@@ -14,6 +18,7 @@
 	<string>Optional alerts when a new meal photo arrives. Notifications stay off unless you turn them on. The Home Screen widget is the default way to see meals.</string>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
 </dict>

@@ -21,22 +21,30 @@ struct MealFeedView: View {
     }
 
     private var mealList: some View {
-        ScrollView {
+        let ordered = MealFeedOrdering.deduplicatedNewestFirst(feed.meals)
+        return ScrollView {
             VStack(spacing: 20) {
-                if let hero = feed.meals.first {
+                if let lastError = feed.lastError {
+                    Text(lastError)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.terracotta)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if let hero = ordered.first {
                     Button {
                         selectedMeal = hero
                     } label: {
-                        MealHeroCard(meal: hero, image: feed.latestPhoto ?? LatestMealStore.photo(for: hero))
+                        MealHeroCard(meal: hero, image: LatestMealStore.photo(for: hero))
                     }
                     .buttonStyle(.plain)
                 }
-                if feed.meals.count > 1 {
+                if ordered.count > 1 {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Earlier")
                             .font(.headline)
                             .foregroundStyle(Palette.ink)
-                        ForEach(feed.meals.dropFirst()) { meal in
+                        ForEach(Array(ordered.dropFirst()), id: \.id) { meal in
                             Button {
                                 selectedMeal = meal
                             } label: {

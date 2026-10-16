@@ -28,6 +28,12 @@ def meals_icloud_container
   "iCloud.#{meals_bundle_id}"
 end
 
+# Mirrors MEALS_WIDGET_CLOUDKIT in Config/Shared.xcconfig (selects the widget entitlements).
+def widget_cloudkit_enabled?
+  path = File.join(GITHUB_WORKSPACE, "Config", "Shared.xcconfig")
+  File.exist?(path) && File.read(path).match?(/^MEALS_WIDGET_CLOUDKIT\s*=\s*YES\b/)
+end
+
 # Inject real TEAMID into Config/Team.xcconfig for this CI run only (not committed).
 def inject_team_id!
   path = File.join(GITHUB_WORKSPACE, "Config", "Team.xcconfig")
@@ -446,8 +452,14 @@ platform :ios do
     ensure_capability!(app, Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD, settings: icloud_settings)
     ensure_capability!(app, Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS)
 
-    # Widget: App Groups only
+    # Widget: App Groups, plus iCloud (CloudKit) when MEALS_WIDGET_CLOUDKIT = YES
+    widget_cloudkit = widget_cloudkit_enabled?
     ensure_capability!(widget, Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS)
+    if widget_cloudkit
+      ensure_capability!(widget, Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD, settings: icloud_settings)
+    else
+      UI.message("MEALS_WIDGET_CLOUDKIT is not YES; leaving iCloud off the widget App ID")
+    end
 
     UI.important("Wiring App Group #{app_group} onto #{bundle_id} and #{widget_id}")
     app_group_ok = wire_app_group!(app, app_group)
@@ -456,7 +468,13 @@ platform :ios do
     UI.important("Wiring CloudKit container #{icloud} onto #{bundle_id}")
     cloud_ok = wire_cloud_container!(app, icloud)
 
-    if app_group_ok && widget_group_ok && cloud_ok
+    widget_cloud_ok = true
+    if widget_cloudkit
+      UI.important("Wiring CloudKit container #{icloud} onto #{widget_id}")
+      widget_cloud_ok = wire_cloud_container!(widget, icloud)
+    end
+
+    if app_group_ok && widget_group_ok && cloud_ok && widget_cloud_ok
       UI.success("Bundle IDs ensured and wired: #{bundle_id}, #{widget_id}")
       UI.success("App Group #{app_group} + CloudKit #{icloud} linked via API")
     else
@@ -466,6 +484,7 @@ platform :ios do
       UI.important("Confirm in Developer portal, then rely on certs (force:true):")
       UI.important("  1) #{bundle_id} → App Groups → #{app_group}; iCloud/CloudKit → #{icloud}")
       UI.important("  2) #{widget_id} → App Groups → #{app_group}")
+      UI.important("  3) #{widget_id} → iCloud/CloudKit → #{icloud}") if widget_cloudkit
       UI.user_error!("REQUIRE_API_WIRE=1 set and API linkage failed") if ENV["REQUIRE_API_WIRE"] == "1"
     end
   end
