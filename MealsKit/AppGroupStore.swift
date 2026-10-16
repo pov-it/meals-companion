@@ -41,6 +41,19 @@ public enum AppGroupStore {
     }
 }
 
+public enum NotificationPreferences {
+    public static let userVisibleDefaultsToOff = true
+
+    public static var userVisibleEnabled: Bool {
+        get { AppGroupStore.defaults.bool(forKey: Keys.userVisible) }
+        set { AppGroupStore.defaults.set(newValue, forKey: Keys.userVisible) }
+    }
+
+    private enum Keys {
+        static let userVisible = "notifications.userVisibleEnabled"
+    }
+}
+
 public enum PairingStore {
     private static let key = "pairing.state"
 
