@@ -578,7 +578,9 @@ platform :ios do
       api_key: api_key,
       skip_submission: false,
       ipa: "MealsCompanion.ipa",
-      skip_waiting_for_build_processing: true,
+      skip_waiting_for_build_processing: false,
+      distribute_external: false,
+      groups: [ENV.fetch("TESTFLIGHT_GROUP", "Mayee")],
       changelog: "#{git_branch} #{last_git_commit[:abbreviated_commit_hash]}"
     )
   end
